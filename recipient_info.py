@@ -3,6 +3,7 @@ from schema_classes import ShippingContact
 
 sample_recipient = ShippingContact(
     street_line_one = "308 Negra Arroyo Ln",
+    street_line_two = "Apt 737",
     city = "Albuquerque",
     state_code= "NM",
     postal_code= "87104",

@@ -32,7 +32,7 @@ def build_fedex_ship_payload(shipper, recipient, service_type, shipment_weight=1
             },
             "recipients": [{
                 "address": {
-                    "streetLines": [recipient.street_line_one, recipient.street_line_two],
+                    "streetLines": recipient.street_lines,
                     "city": recipient.city,
                     "stateOrProvinceCode": recipient.state_code,
                     "postalCode": recipient.postal_code,

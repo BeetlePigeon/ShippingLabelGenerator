@@ -12,3 +12,8 @@ class ShippingContact(BaseModel):
     full_name: str
     email_address: str
     phone_number: str
+
+    @property
+    def street_lines(self) -> list[str]:
+        lines = [self.street_line_one, self.street_line_two]
+        return [line for line in lines if line is not None]
