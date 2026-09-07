@@ -3,9 +3,12 @@ import base64
 from pathlib import Path
 import requests
 from jsonschema import validate, ValidationError
-from private import api_key, secret_key, shipper
-from ship_payload import build_fedex_ship_payload, SERVICE_TYPES
+from private import api_key, secret_key, charge_code
+from ship_payload import build_fedex_ship_payload
+from shipper_info import get_default_shipper_info
 from recipient_info import get_sample_recipient_info
+from schema_classes import Shipment, ServiceType
+
 
 def get_access_token():
     url = "https://apis-sandbox.fedex.com/oauth/token"
@@ -54,12 +57,26 @@ def create_label(token):
         'Authorization': f"Bearer {token}"
         }
 
+    shipper = get_default_shipper_info()
     recipient = get_sample_recipient_info()
-    label_payload = build_fedex_ship_payload(shipper, recipient, SERVICE_TYPES[2])
+
+    shipment = Shipment(
+        shipper=shipper,
+        recipient=recipient,
+        asset_number="SAMPLE_ASSET_73",
+        case_number="SAMPLE_CASE_37",
+        service_type=ServiceType.FEDEX_2_DAY,
+        charge_code=charge_code
+    )
+
+    label_payload = build_fedex_ship_payload(shipment)
     response = requests.post(url, json=label_payload, headers=headers, timeout=30)
+
     print(response.status_code)
     print(response.text)
+
     response.raise_for_status()
+
     response_data = response.json()
     save_label(response_data, recipient)
 

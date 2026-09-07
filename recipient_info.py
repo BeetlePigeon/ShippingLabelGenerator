@@ -11,7 +11,7 @@ sample_recipient = ShippingContact(
     is_residential = True,
     full_name = "Walter White",
     email_address = "walter.white@graymatter.technologies",
-    phone_number = "505-503-4455",
+    provided_phone_number = "505-503-4455",
 )
 
 def get_sample_recipient_info():
