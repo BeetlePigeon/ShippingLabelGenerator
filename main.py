@@ -1,12 +1,11 @@
-import json
 import base64
 from pathlib import Path
 import requests
-from jsonschema import validate, ValidationError
 from private import api_key, secret_key, charge_code
 from ship_payload import build_fedex_ship_payload
 from shipper_info import get_default_shipper_info
-from recipient_info import get_sample_recipient_info
+from input import example_input
+from recipient_info import get_recipient_info_from_input
 from schema_classes import Shipment, ServiceType
 
 
@@ -28,27 +27,6 @@ def get_access_token():
     return token
 
 
-def validate_payload(payload):
-    ## Legacy function, remove it or upgrade it later
-    ship_schema_filename = "fedex_ship_schema.json"
-    schema_path = Path(__file__).parent / ship_schema_filename
-    try:
-        with schema_path.open("r", encoding="utf-8") as file:
-            ship_schema = json.load(file)
-        validate(instance=payload, schema=ship_schema)
-        print("Valid payload, sending to FedEx...")
-        return True
-    except FileNotFoundError:
-        print(f"File {ship_schema_filename} not found")
-        return False
-    except json.JSONDecodeError as e:
-        print(f"Invalid JSON in {ship_schema_filename}: {e}")
-        return False
-    except ValidationError as e:
-        print(f"Ship payload validation failed: {e.message}")
-        return False
-
-
 def create_label(token):
     url = "https://apis-sandbox.fedex.com/ship/v1/shipments"
     headers = {
@@ -57,16 +35,19 @@ def create_label(token):
         'Authorization': f"Bearer {token}"
         }
 
+    input_data = example_input
     shipper = get_default_shipper_info()
-    recipient = get_sample_recipient_info()
+    recipient = get_recipient_info_from_input(input_data)
 
     shipment = Shipment(
         shipper=shipper,
         recipient=recipient,
-        asset_number="SAMPLE_ASSET_73",
-        case_number="SAMPLE_CASE_37",
+        asset_number=input_data.asset_number,
+        case_number=input_data.case_number,
         service_type=ServiceType.FEDEX_2_DAY,
-        charge_code=charge_code
+        charge_code=charge_code,
+        shipment_weight=input_data.shipment_weight,
+        other_emails_to_notify=input_data.other_emails_to_notify,
     )
 
     label_payload = build_fedex_ship_payload(shipment)
@@ -82,11 +63,12 @@ def create_label(token):
 
 
 def save_label(response_data, label_recipient):
+    tracking_number = response_data["output"]["transactionShipments"][0]["masterTrackingNumber"]
     encoded_label = response_data["output"]["transactionShipments"][0]["pieceResponses"][0]["packageDocuments"][0]["encodedLabel"]
     label_bytes = base64.b64decode(encoded_label)
     output_directory = Path("output_labels")
     output_directory.mkdir(exist_ok=True)
-    label_path = output_directory / f"{label_recipient.full_name}.pdf"
+    label_path = output_directory / f"{label_recipient.full_name}_{tracking_number}.pdf"
     label_path.write_bytes(label_bytes)
 
 

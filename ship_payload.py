@@ -1,4 +1,4 @@
-from private import account_number, charge_code, company_name
+from private import account_number, company_name
 
 
 def build_email_notifications_schema_list(shipment):
@@ -47,12 +47,12 @@ def build_fedex_ship_payload(shipment):
         "requestedShipment": {
             "shipper": {
                 "address": {
-                    "streetLines": [shipment.shipper.street_line_one, shipment.shipper.street_line_two],
-                    "city": shipment.shipper.city,
-                    "stateOrProvinceCode": shipment.shipper.state_code,
-                    "postalCode": shipment.shipper.postal_code,
-                    "countryCode": shipment.shipper.country_code,
-                    "residential": shipment.shipper.is_residential,
+                    "streetLines": shipment.shipper.address.street_lines,
+                    "city": shipment.shipper.address.city,
+                    "stateOrProvinceCode": shipment.shipper.address.state_code,
+                    "postalCode": shipment.shipper.address.postal_code,
+                    "countryCode": shipment.shipper.address.country_code,
+                    "residential": shipment.shipper.address.is_residential,
                 },
                 "contact": {
                     "personName": shipment.shipper.full_name,
@@ -62,12 +62,12 @@ def build_fedex_ship_payload(shipment):
             },
             "recipients": [{
                 "address": {
-                    "streetLines": shipment.recipient.street_lines,
-                    "city": shipment.recipient.city,
-                    "stateOrProvinceCode": shipment.recipient.state_code,
-                    "postalCode": shipment.recipient.postal_code,
-                    "countryCode": shipment.recipient.country_code,
-                    "residential": shipment.recipient.is_residential,
+                    "streetLines": shipment.recipient.address.street_lines,
+                    "city": shipment.recipient.address.city,
+                    "stateOrProvinceCode": shipment.recipient.address.state_code,
+                    "postalCode": shipment.recipient.address.postal_code,
+                    "countryCode": shipment.recipient.address.country_code,
+                    "residential": shipment.recipient.address.is_residential,
                 },
                 "contact": {
                     "personName": shipment.recipient.full_name,
