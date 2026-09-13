@@ -49,7 +49,7 @@ class Shipment(BaseModel):
     default_service_type: ServiceType = ServiceType.FEDEX_EXPRESS_SAVER
     selected_service_type: ServiceType | None = None
     charge_code: str
-    shipment_weight: str = "10"
+    shipment_weight: float = 10
     other_emails_to_notify: list[str] = Field(default_factory=list)
 
     @property
@@ -67,8 +67,8 @@ class InputData(BaseModel):
     email_address: str | None = ""
     phone_number: str
     is_residential_address: bool
-    shipment_weight: str = "10"
+    shipment_weight: float = 10
     case_number: str | None = ""
     asset_number: str | None = ""
     other_emails_to_notify: list[str] = Field(default_factory=list)
-    service_type: ServiceType | None
+    service_type: ServiceType | None = None

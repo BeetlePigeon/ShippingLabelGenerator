@@ -105,8 +105,12 @@ def build_fedex_ship_payload(shipment):
 def build_fedex_rates_payload(shipment):
 
     rates_schema = {
-        "accountNumber": {"value": account_number},
-        "rateRequestControlParameters": {"returnTransitTimes": True},
+        "accountNumber": {
+            "value": account_number
+        },
+        "rateRequestControlParameters": {
+            "returnTransitTimes": True
+        },
         "requestedShipment": {
             "shipper": {
                 "address": {
@@ -127,14 +131,15 @@ def build_fedex_rates_payload(shipment):
                 }
             },
             "pickupType": "DROPOFF_AT_FEDEX_LOCATION",
+            "packagingType": "YOUR_PACKAGING",
             "requestedPackageLineItems": [
                 {
-                "weight": shipment.shipment_weight,
+                "weight": {
+                    "units": "LB",
+                    "value": shipment.shipment_weight,
+                },
             }
             ],
-            "packagingType": "YOUR_PACKAGING",
-            "totalPackageCount": 1,
-            "totalWeight": shipment.shipment_weight,
         },
     }
 

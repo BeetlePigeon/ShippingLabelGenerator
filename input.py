@@ -11,9 +11,7 @@ example_input = InputData(
     email_address="",
     phone_number="505-503-4455",
     is_residential_address=True,
-    shipment_weight="10",
     case_number="CAS-12345-6789",
     asset_number="123456",
     other_emails_to_notify=["john.doe@example.com"],
-    service_type=None,
 )
