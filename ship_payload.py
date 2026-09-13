@@ -100,3 +100,42 @@ def build_fedex_ship_payload(shipment):
     }
 
     return ship_schema
+
+
+def build_fedex_rates_payload(shipment):
+
+    rates_schema = {
+        "accountNumber": {"value": account_number},
+        "rateRequestControlParameters": {"returnTransitTimes": True},
+        "requestedShipment": {
+            "shipper": {
+                "address": {
+                    "city": shipment.shipper.address.city,
+                    "stateOrProvinceCode": shipment.shipper.address.state_code,
+                    "postalCode": shipment.shipper.address.postal_code,
+                    "countryCode": shipment.shipper.address.country_code,
+                    "residential": shipment.shipper.address.is_residential,
+                }
+            },
+            "recipient": {
+                "address": {
+                    "city": shipment.recipient.address.city,
+                    "stateOrProvinceCode": shipment.recipient.address.state_code,
+                    "postalCode": shipment.recipient.address.postal_code,
+                    "countryCode": shipment.recipient.address.country_code,
+                    "residential": shipment.recipient.address.is_residential,
+                }
+            },
+            "pickupType": "DROPOFF_AT_FEDEX_LOCATION",
+            "requestedPackageLineItems": [
+                {
+                "weight": shipment.shipment_weight,
+            }
+            ],
+            "packagingType": "YOUR_PACKAGING",
+            "totalPackageCount": 1,
+            "totalWeight": shipment.shipment_weight,
+        },
+    }
+
+    return rates_schema

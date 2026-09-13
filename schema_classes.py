@@ -3,22 +3,6 @@ from pydantic import BaseModel, Field
 from private import default_phone_number
 
 
-class InputData(BaseModel):
-    address_line_one: str
-    address_line_two: str | None = None
-    city: str
-    state: str
-    zip_code: str
-    name: str
-    email_address: str | None = ""
-    phone_number: str
-    is_residential_address: bool
-    shipment_weight: str = "10"
-    case_number: str | None = ""
-    asset_number: str | None = ""
-    other_emails_to_notify: list[str] = Field(default_factory=list)
-
-
 class ServiceType(StrEnum):
     PRIORITY_OVERNIGHT = "PRIORITY_OVERNIGHT"  # 1 business day
     FEDEX_2_DAY = "FEDEX_2_DAY"  # 2 business days
@@ -50,7 +34,6 @@ class ShippingContact(BaseModel):
     email_address: str
     provided_phone_number: str | None = None
 
-
     @property
     def phone_number(self) -> str:
         if not self.provided_phone_number:
@@ -63,7 +46,29 @@ class Shipment(BaseModel):
     recipient: ShippingContact
     case_number: str | None = ""
     asset_number: str | None = ""
-    service_type: ServiceType
+    default_service_type: ServiceType = ServiceType.FEDEX_EXPRESS_SAVER
+    selected_service_type: ServiceType | None = None
     charge_code: str
-    shipment_weight: float = 10
+    shipment_weight: str = "10"
     other_emails_to_notify: list[str] = Field(default_factory=list)
+
+    @property
+    def service_type(self) -> ServiceType:
+        return self.selected_service_type or self.default_service_type
+
+
+class InputData(BaseModel):
+    address_line_one: str
+    address_line_two: str | None = None
+    city: str
+    state: str
+    zip_code: str
+    name: str
+    email_address: str | None = ""
+    phone_number: str
+    is_residential_address: bool
+    shipment_weight: str = "10"
+    case_number: str | None = ""
+    asset_number: str | None = ""
+    other_emails_to_notify: list[str] = Field(default_factory=list)
+    service_type: ServiceType | None
