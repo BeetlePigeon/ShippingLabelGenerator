@@ -1,7 +1,8 @@
 import base64
 from pathlib import Path
 import requests
-from private import api_key, secret_key, charge_code
+from api_settings import APIEnvironment
+from private import sandbox_api_key, sandbox_secret_key, production_rates_api_key, production_rates_secret_key, production_ship_api_key, production_ship_secret_key, charge_code, test_key_account_number, shipper_account_number
 from ship_payload import build_fedex_ship_payload, build_fedex_rates_payload
 from shipper_info import get_default_shipper_info
 from input import example_input
@@ -9,8 +10,11 @@ from recipient_info import get_recipient_info_from_input
 from schema_classes import Shipment
 
 
-def get_access_token():
-    url = "https://apis-sandbox.fedex.com/oauth/token"
+def get_access_token(api_key, secret_key, environment):
+    if environment == APIEnvironment.SANDBOX:
+        url = "https://apis-sandbox.fedex.com/oauth/token"
+    else:
+        url = "https://apis.fedex.com/oauth/token"
     headers = {
         'Content-Type': "application/x-www-form-urlencoded"
         }
@@ -45,15 +49,23 @@ def create_pre_shipment(input_data):
     return shipment_data
 
 
-def get_rates(token, shipment_data):
-    url = "https://apis-sandbox.fedex.com/rate/v1/rates/quotes"
+def get_rates(sandbox_auth_token, production_auth_token, shipment_data, environment):
+    if environment == APIEnvironment.SANDBOX:
+        url = "https://apis-sandbox.fedex.com/rate/v1/rates/quotes"
+        token = sandbox_auth_token
+        account_number = test_key_account_number
+    else:
+        url = "https://apis.fedex.com/rate/v1/rates/quotes"
+        token = production_auth_token
+        account_number = shipper_account_number
+
     headers = {
         'Content-Type': "application/json",
         'X-locale': "en_US",
         'Authorization': f"Bearer {token}"
     }
 
-    payload = build_fedex_rates_payload(shipment_data)
+    payload = build_fedex_rates_payload(shipment_data, account_number)
     response = requests.post(url, json=payload, headers=headers, timeout=30)
 
     print(response.status_code)
@@ -70,15 +82,23 @@ def select_from_available_rates(shipment, rates=None):
     return shipment
 
 
-def create_label(token, shipment_data):
-    url = "https://apis-sandbox.fedex.com/ship/v1/shipments"
+def create_label(sandbox_auth_token, production_auth_token, shipment_data, environment):
+    if environment == APIEnvironment.SANDBOX:
+        url = "https://apis-sandbox.fedex.com/ship/v1/shipments"
+        token = sandbox_auth_token
+        account_number = test_key_account_number
+    else:
+        url = "https://apis.fedex.com/ship/v1/shipments"
+        token = production_auth_token
+        account_number = shipper_account_number
+
     headers = {
         'Content-Type': "application/json",
         'X-locale': "en_US",
         'Authorization': f"Bearer {token}"
         }
 
-    label_payload = build_fedex_ship_payload(shipment_data)
+    label_payload = build_fedex_ship_payload(shipment_data, account_number)
     response = requests.post(url, json=label_payload, headers=headers, timeout=30)
     print(f"Label creation status code: {response.status_code}\n")
     response.raise_for_status()
@@ -99,9 +119,18 @@ def save_label(response_data, label_recipient_name):
 
 
 if __name__ == '__main__':
-    access_token = get_access_token()
+    ## CONFIG HERE ONLY
+    rates_API_config, ship_API_config = APIEnvironment.PRODUCTION, APIEnvironment.SANDBOX
+
+    # Fetch OAuth tokens
+    sandbox_token = get_access_token(sandbox_api_key, sandbox_secret_key, APIEnvironment.SANDBOX) # Both sandbox APIs use the same OAuth creds
+    production_rates_token = get_access_token(production_rates_api_key, production_rates_secret_key, APIEnvironment.PRODUCTION)
+#    production_ship_token = get_access_token(production_ship_api_key, production_ship_secret_key, APIEnvironment.PRODUCTION)
+    production_ship_token = ""      # Placeholder until production keys obtained
+
+    # Process shipment input data into shipping label PDF
     shipment_without_rate = create_pre_shipment(example_input)
-#    available_rates = get_rates(access_token, shipment_without_rate)
+    available_rates = get_rates(sandbox_token, production_rates_token, shipment_without_rate, rates_API_config)
     shipment_with_rate_selected = select_from_available_rates(shipment_without_rate)
-    label = create_label(access_token, shipment_with_rate_selected)
+    label = create_label(sandbox_token, production_ship_token, shipment_with_rate_selected, ship_API_config)
     save_label(label, shipment_with_rate_selected.recipient.full_name)

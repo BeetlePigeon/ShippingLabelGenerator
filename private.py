@@ -4,9 +4,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-api_key = os.environ["FEDEX_API_KEY"]
-secret_key = os.environ["FEDEX_SECRET_KEY"]
-account_number = os.environ["ACCOUNT_NUMBER"]
+sandbox_api_key = os.environ["FEDEX_SANDBOX_API_KEY"]
+sandbox_secret_key = os.environ["FEDEX_SANDBOX_SECRET_KEY"]
+production_rates_api_key = os.environ["FEDEX_PRODUCTION_RATES_API_KEY"]
+production_rates_secret_key = os.environ["FEDEX_PRODUCTION_RATES_SECRET_KEY"]
+production_ship_api_key = os.environ["FEDEX_PRODUCTION_SHIP_API_KEY"]
+production_ship_secret_key = os.environ["FEDEX_PRODUCTION_SHIP_SECRET_KEY"]
+test_key_account_number = os.environ["TEST_KEY_ACCOUNT_NUMBER"]
+shipper_account_number = os.environ["SHIPPER_ACCOUNT_NUMBER"]
 company_name = os.environ["COMPANY_NAME"]
 default_phone_number = os.environ["DEFAULT_PHONE_NUMBER"]
 charge_code = os.environ["CHARGE_CODE"]

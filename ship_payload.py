@@ -1,4 +1,4 @@
-from private import account_number, company_name
+from private import company_name
 
 
 def build_email_notifications_schema_list(shipment):
@@ -39,7 +39,7 @@ def build_email_notifications_schema_list(shipment):
     return notifications_data
 
 
-def build_fedex_ship_payload(shipment):
+def build_fedex_ship_payload(shipment, account_number):
 
     email_notifications_schema_list = build_email_notifications_schema_list(shipment)
 
@@ -102,7 +102,7 @@ def build_fedex_ship_payload(shipment):
     return ship_schema
 
 
-def build_fedex_rates_payload(shipment):
+def build_fedex_rates_payload(shipment, account_number):
 
     rates_schema = {
         "accountNumber": {
@@ -132,6 +132,9 @@ def build_fedex_rates_payload(shipment):
             },
             "pickupType": "DROPOFF_AT_FEDEX_LOCATION",
             "packagingType": "YOUR_PACKAGING",
+            "rateRequestType": [
+                "ACCOUNT"
+            ],
             "requestedPackageLineItems": [
                 {
                 "weight": {
