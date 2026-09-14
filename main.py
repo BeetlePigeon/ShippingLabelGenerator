@@ -1,13 +1,13 @@
 import base64
 from pathlib import Path
 import requests
-from api_settings import APIEnvironment
+from api_settings import APIEnvironment, rates_API_config, ship_API_config
 from private import sandbox_api_key, sandbox_secret_key, production_rates_api_key, production_rates_secret_key, production_ship_api_key, production_ship_secret_key, charge_code, test_key_account_number, shipper_account_number
-from ship_payload import build_fedex_ship_payload, build_fedex_rates_payload
+from payload_builders import build_fedex_ship_payload, build_fedex_rates_payload
 from shipper_info import get_default_shipper_info
 from input import example_input
 from recipient_info import get_recipient_info_from_input
-from schema_classes import Shipment
+from schema_classes import Shipment, RatesOption, RatesOptions
 
 
 def get_access_token(api_key, secret_key, environment):
@@ -49,7 +49,7 @@ def create_pre_shipment(input_data):
     return shipment_data
 
 
-def get_rates(sandbox_auth_token, production_auth_token, shipment_data, environment):
+def populate_rates_options(sandbox_auth_token, production_auth_token, shipment_data, environment):
     if environment == APIEnvironment.SANDBOX:
         url = "https://apis-sandbox.fedex.com/rate/v1/rates/quotes"
         token = sandbox_auth_token
@@ -68,17 +68,27 @@ def get_rates(sandbox_auth_token, production_auth_token, shipment_data, environm
     payload = build_fedex_rates_payload(shipment_data, account_number)
     response = requests.post(url, json=payload, headers=headers, timeout=30)
 
-    print(response.status_code)
-    print(response.text)
+    print(f"Rates retrieval status code: {response.status_code}")
     response.raise_for_status()
     rates_data = response.json()
 
-    return rates_data
+    rates_options = []
+    for rates_option in rates_data["output"]["rateReplyDetails"]:
+        rates_options.append(
+            RatesOption(
+                service_type=rates_option["serviceType"],
+                estimated_delivery_time=rates_option["commit"]["dateDetail"]["dayFormat"],
+                estimated_delivery_cost=rates_option["ratedShipmentDetails"][0]["totalNetFedExCharge"],
+            )
+        )
+
+    rates_options = RatesOptions(options=rates_options)
+
+    return rates_options
 
 
-def select_from_available_rates(shipment, rates=None):
-    if not rates:
-        shipment.selected_service_type = None
+def select_from_rates_options(shipment, rates):
+    shipment.selected_service_type = rates.cheapest
     return shipment
 
 
@@ -119,9 +129,6 @@ def save_label(response_data, label_recipient_name):
 
 
 if __name__ == '__main__':
-    ## CONFIG HERE ONLY
-    rates_API_config, ship_API_config = APIEnvironment.PRODUCTION, APIEnvironment.SANDBOX
-
     # Fetch OAuth tokens
     sandbox_token = get_access_token(sandbox_api_key, sandbox_secret_key, APIEnvironment.SANDBOX) # Both sandbox APIs use the same OAuth creds
     production_rates_token = get_access_token(production_rates_api_key, production_rates_secret_key, APIEnvironment.PRODUCTION)
@@ -129,8 +136,10 @@ if __name__ == '__main__':
     production_ship_token = ""      # Placeholder until production keys obtained
 
     # Process shipment input data into shipping label PDF
-    shipment_without_rate = create_pre_shipment(example_input)
-    available_rates = get_rates(sandbox_token, production_rates_token, shipment_without_rate, rates_API_config)
-    shipment_with_rate_selected = select_from_available_rates(shipment_without_rate)
-    label = create_label(sandbox_token, production_ship_token, shipment_with_rate_selected, ship_API_config)
-    save_label(label, shipment_with_rate_selected.recipient.full_name)
+    shipment_without_rate_option_selected = create_pre_shipment(example_input)
+    print(shipment_without_rate_option_selected.selected_service_type)
+    available_rates_options = populate_rates_options(sandbox_token, production_rates_token, shipment_without_rate_option_selected, rates_API_config)
+    shipment_with_rate_option_selected = select_from_rates_options(shipment_without_rate_option_selected, available_rates_options)
+    print(shipment_with_rate_option_selected.selected_service_type)
+    label = create_label(sandbox_token, production_ship_token, shipment_with_rate_option_selected, ship_API_config)
+    save_label(label, shipment_with_rate_option_selected.recipient.full_name)

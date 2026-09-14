@@ -1,16 +1,37 @@
+from datetime import datetime
 from enum import StrEnum
 from pydantic import BaseModel, Field
 from private import default_phone_number
 
 
 class ServiceType(StrEnum):
+    # Service types listed are from fastest to slowest
+    FIRST_OVERNIGHT = "FIRST_OVERNIGHT" # 1 business day
     PRIORITY_OVERNIGHT = "PRIORITY_OVERNIGHT"  # 1 business day
+    STANDARD_OVERNIGHT = "STANDARD_OVERNIGHT"   # 1 business day
+    FEDEX_2_DAY_AM = "FEDEX_2_DAY_AM"   # 2 business days
     FEDEX_2_DAY = "FEDEX_2_DAY"  # 2 business days
     FEDEX_EXPRESS_SAVER = "FEDEX_EXPRESS_SAVER"  # 3 business days
+    FEDEX_GROUND = "FEDEX_GROUND"  # Use for commercial delivery address
+    GROUND_HOME_DELIVERY = "GROUND_HOME_DELIVERY"  # Use for residential delivery address
 
-    # Regular
-    FEDEX_GROUND_COMMERCIAL = "FEDEX_GROUND"  # Use for commercial address deliveries
-    FEDEX_GROUND_HOME = "GROUND_HOME_DELIVERY"  # Use for residential address deliveries
+
+class RatesOption(BaseModel):
+    service_type: ServiceType
+    estimated_delivery_time: datetime
+    estimated_delivery_cost: float
+
+
+class RatesOptions(BaseModel):
+    options: list[RatesOption]
+
+    @property
+    def fastest(self) -> RatesOption:
+        return min(self.options, key=lambda option: option.estimated_delivery_time)
+
+    @property
+    def cheapest(self) -> RatesOption:
+        return min(self.options, key=lambda option: option.estimated_delivery_cost)
 
 
 class Address(BaseModel):
@@ -71,4 +92,3 @@ class InputData(BaseModel):
     case_number: str | None = ""
     asset_number: str | None = ""
     other_emails_to_notify: list[str] = Field(default_factory=list)
-    service_type: ServiceType | None = None

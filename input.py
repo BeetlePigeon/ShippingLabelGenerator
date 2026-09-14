@@ -1,4 +1,4 @@
-from schema_classes import InputData, ServiceType
+from schema_classes import InputData
 
 
 example_input = InputData(
