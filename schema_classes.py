@@ -1,18 +1,18 @@
 from datetime import datetime
 from enum import StrEnum
 from pydantic import BaseModel, Field
-from private import default_phone_number
+from private import recipient_default_phone_number
 
 
 class ServiceType(StrEnum):
     # Service types listed are from fastest to slowest
-    FIRST_OVERNIGHT = "FIRST_OVERNIGHT" # 1 business day
+    FIRST_OVERNIGHT = "FIRST_OVERNIGHT" # 1 business day    # EXPRESS
     PRIORITY_OVERNIGHT = "PRIORITY_OVERNIGHT"  # 1 business day
     STANDARD_OVERNIGHT = "STANDARD_OVERNIGHT"   # 1 business day
     FEDEX_2_DAY_AM = "FEDEX_2_DAY_AM"   # 2 business days
     FEDEX_2_DAY = "FEDEX_2_DAY"  # 2 business days
     FEDEX_EXPRESS_SAVER = "FEDEX_EXPRESS_SAVER"  # 3 business days
-    FEDEX_GROUND = "FEDEX_GROUND"  # Use for commercial delivery address
+    FEDEX_GROUND = "FEDEX_GROUND"  # Use for commercial delivery address    #
     GROUND_HOME_DELIVERY = "GROUND_HOME_DELIVERY"  # Use for residential delivery address
 
 
@@ -58,7 +58,7 @@ class ShippingContact(BaseModel):
     @property
     def phone_number(self) -> str:
         if not self.provided_phone_number:
-            return default_phone_number
+            return recipient_default_phone_number
         return self.provided_phone_number
 
 
