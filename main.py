@@ -43,7 +43,7 @@ def create_pre_shipment(input_data):
         charge_code=charge_code,
         shipment_weight=input_data.shipment_weight,
         other_emails_to_notify=input_data.other_emails_to_notify,
-        selected_service_type=None,
+        selected_service_type=input_data.selected_service_type,
     )
 
     return shipment_data

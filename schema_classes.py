@@ -92,3 +92,4 @@ class InputData(BaseModel):
     case_number: str | None = ""
     asset_number: str | None = ""
     other_emails_to_notify: list[str] = Field(default_factory=list)
+    selected_service_type: ServiceType | None
