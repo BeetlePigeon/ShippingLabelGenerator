@@ -4,9 +4,9 @@ import requests
 from api_settings import APIEnvironment, rates_API_config, ship_API_config
 from private import sandbox_api_key, sandbox_secret_key, production_api_key, production_secret_key, charge_code, test_key_account_number, shipper_account_number
 from payload_builders import build_fedex_ship_payload, build_fedex_rates_payload
-from shipper_info import get_default_shipper_info
+from shipper_data import get_default_shipper_info
 from input import example_input
-from recipient_info import get_recipient_info_from_input
+from recipient_data_builder import get_recipient_info_from_input
 from schema_classes import Shipment, RatesOption, RatesOptions
 
 
@@ -113,7 +113,15 @@ def create_label(sandbox_auth_token, production_auth_token, shipment_data, envir
         }
 
     label_payload = build_fedex_ship_payload(shipment_data, account_number)
+
+    import json
+    print(json.dumps(
+        label_payload["requestedShipment"]["emailNotificationDetail"],
+        indent=2,
+        default=str
+    ))
     response = requests.post(url, json=label_payload, headers=headers, timeout=30)
+#    print(response.text)
     print(f"Label creation status code: {response.status_code}")
 
     response.raise_for_status()

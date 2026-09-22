@@ -2,6 +2,22 @@ from private import company_name
 
 
 def build_email_notifications_schema_list(shipment):
+    notifications_data = [
+        {
+            "name": shipment.shipper.full_name,
+            "emailNotificationRecipientType": "SHIPPER",
+            "emailAddress": shipment.shipper.email_address,
+            "notificationEventType": ["ON_SHIPMENT"],
+            "notificationFormatType": "HTML",
+            "notificationType": "EMAIL",
+            "locale": "en_US",
+        }
+    ]
+
+    return notifications_data
+
+
+def build_email_notifications_schema_list2(shipment):
     notification_events_to_include = [
         "ON_SHIPMENT",
         "ON_TENDER",
@@ -16,6 +32,9 @@ def build_email_notifications_schema_list(shipment):
             "emailNotificationRecipientType": "SHIPPER",
             "emailAddress": shipment.shipper.email_address,
             "notificationEventType": notification_events_to_include,
+            "notificationFormatType": "HTML",
+            "notificationType": "EMAIL",
+            "locale": "en_US",
         },
 
         {
@@ -23,6 +42,9 @@ def build_email_notifications_schema_list(shipment):
             "emailNotificationRecipientType": "RECIPIENT",
             "emailAddress": shipment.recipient.email_address,
             "notificationEventType": notification_events_to_include,
+            "notificationFormatType": "HTML",
+            "notificationType": "EMAIL",
+            "locale": "en_US",
         }
     ]
 
@@ -33,6 +55,9 @@ def build_email_notifications_schema_list(shipment):
                 "emailNotificationRecipientType": "OTHER",
                 "emailAddress": other_party_email,
                 "notificationEventType": notification_events_to_include,
+                "notificationFormatType": "HTML",
+                "notificationType": "EMAIL",
+                "locale": "en_US",
             }
         )
 
@@ -82,7 +107,8 @@ def build_fedex_ship_payload(shipment, account_number):
             "shippingChargesPayment": {"paymentType": "SENDER"},
             "emailNotificationDetail": {
                 "aggregationType": "PER_SHIPMENT",
-                "emailNotificationRequests": email_notifications_schema_list,
+                "emailNotificationRecipients": email_notifications_schema_list,
+                "personalMessage": "FedEx API email notification test."
             },
             "labelSpecification": {"labelStockType": "PAPER_4X6", "imageType": "PDF", "labelFormatType": "COMMON2D"},
             "requestedPackageLineItems": [
