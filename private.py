@@ -14,6 +14,7 @@ company_name = os.environ["COMPANY_NAME"]
 recipient_default_phone_number = os.environ["RECIPIENT_DEFAULT_PHONE_NUMBER"]
 charge_code = os.environ["CHARGE_CODE"]
 company_email_domain = os.environ["COMPANY_EMAIL_DOMAIN"]
+rp_url_prefix = os.environ["RP_URL_PREFIX"]
 
 # For confidentiality, corporate shipper information has been hidden.
 shipper_street_line_one = os.environ["SHIPPER_STREET_LINE_ONE"]

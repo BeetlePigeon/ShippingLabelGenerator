@@ -93,3 +93,19 @@ class InputData(BaseModel):
     asset_number: str | None = ""
     other_emails_to_notify: list[str] = Field(default_factory=list)
     selected_service_type: ServiceType | None
+
+
+class RequestPortalData(BaseModel):
+    request_for: str
+    request_by: str
+    comments: str | None
+    new_hire_name: str | None
+    new_hire_date: str | None
+    facility: str | None
+    office: str | None
+    address: str | None
+    phone_number: str | None
+    cell_phone: str | None
+    needed_by_date: str | None
+    instructions: str | None
+    others_to_notify: str | None

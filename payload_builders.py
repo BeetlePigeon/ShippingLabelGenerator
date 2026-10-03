@@ -2,22 +2,6 @@ from private import company_name
 
 
 def build_email_notifications_schema_list(shipment):
-    notifications_data = [
-        {
-            "name": shipment.shipper.full_name,
-            "emailNotificationRecipientType": "SHIPPER",
-            "emailAddress": shipment.shipper.email_address,
-            "notificationEventType": ["ON_SHIPMENT"],
-            "notificationFormatType": "HTML",
-            "notificationType": "EMAIL",
-            "locale": "en_US",
-        }
-    ]
-
-    return notifications_data
-
-
-def build_email_notifications_schema_list2(shipment):
     notification_events_to_include = [
         "ON_SHIPMENT",
         "ON_TENDER",
@@ -85,30 +69,35 @@ def build_fedex_ship_payload(shipment, account_number):
                     "phoneNumber": shipment.shipper.phone_number,
                     "companyName": company_name}
             },
-            "recipients": [{
-                "address": {
-                    "streetLines": shipment.recipient.address.street_lines,
-                    "city": shipment.recipient.address.city,
-                    "stateOrProvinceCode": shipment.recipient.address.state_code,
-                    "postalCode": shipment.recipient.address.postal_code,
-                    "countryCode": shipment.recipient.address.country_code,
-                    "residential": shipment.recipient.address.is_residential,
-                },
-                "contact": {
-                    "personName": shipment.recipient.full_name,
-                    "emailAddress": shipment.recipient.email_address,
-                    "phoneNumber": shipment.recipient.phone_number,
-                    "companyName": company_name}
-            }],
+            "recipients": [
+                {
+                    "address": {
+                        "streetLines": shipment.recipient.address.street_lines,
+                        "city": shipment.recipient.address.city,
+                        "stateOrProvinceCode": shipment.recipient.address.state_code,
+                        "postalCode": shipment.recipient.address.postal_code,
+                        "countryCode": shipment.recipient.address.country_code,
+                        "residential": shipment.recipient.address.is_residential,
+                    },
+                    "contact": {
+                        "personName": shipment.recipient.full_name,
+                        "emailAddress": shipment.recipient.email_address,
+                        "phoneNumber": shipment.recipient.phone_number,
+                        "companyName": company_name}
+                }
+            ],
             "pickupType": "DROPOFF_AT_FEDEX_LOCATION",
-            "serviceType": shipment.selected_service_type,
+            "serviceType": shipment.service_type,
             "packagingType": "YOUR_PACKAGING",
             "totalWeight": shipment.shipment_weight,
             "shippingChargesPayment": {"paymentType": "SENDER"},
+            "shipmentSpecialServices": {
+                "specialServiceTypes": ["EVENT_NOTIFICATION"],
+            },
             "emailNotificationDetail": {
                 "aggregationType": "PER_SHIPMENT",
                 "emailNotificationRecipients": email_notifications_schema_list,
-                "personalMessage": "FedEx API email notification test."
+                "personalMessage": "You have a FedEx package on the way!"
             },
             "labelSpecification": {"labelStockType": "PAPER_4X6", "imageType": "PDF", "labelFormatType": "COMMON2D"},
             "requestedPackageLineItems": [
