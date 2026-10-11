@@ -14,7 +14,45 @@ class Scraper:
         if label.count() == 0:
             return ""
         cell = label.first.locator("xpath=..")
-        return cell.locator("span").nth(1).inner_text().strip()
+        inline_info = cell.locator("span.inlineInfo")
+
+        if inline_info.count() > 0:
+            return inline_info.first.inner_text().strip()
+
+        spans = cell.locator("span")
+
+        if spans.count() > 1:
+            return cell.locator("span").nth(1).inner_text().strip()
+
+        return ""
+
+
+    @staticmethod
+    def request_number_is_feasible(request_number):
+        if not request_number or not request_number.isdigit() or len(request_number) != 6:
+            return False
+        return True
+
+
+    def request_is_valid(self, url):
+        with sync_playwright() as p:
+            context = p.chromium.launch_persistent_context(
+                user_data_dir=self.playwright_profile,
+                headless=True,
+            )
+            page = context.pages[0] if context.pages else context.new_page()
+            try:
+                page.goto(url, wait_until="domcontentloaded")
+            except Error:
+                pass
+
+            error_heading = page.locator("#leftContent h2", has_text="Sorry, an error occurred while processing your request.")
+
+            if error_heading.count() > 0:
+                context.close()
+                return False
+
+            return True
 
 
     def session_is_authenticated(self, url):
@@ -34,33 +72,6 @@ class Scraper:
                 context.close()
                 return True
             return False
-
-
-    def url_entry_is_valid(self, url):
-        if not url:
-            return False
-
-        if not url.startswith(rp_url_prefix):
-            return False
-
-        with sync_playwright() as p:
-            context = p.chromium.launch_persistent_context(
-                user_data_dir=self.playwright_profile,
-                headless=True,
-            )
-            page = context.pages[0] if context.pages else context.new_page()
-            try:
-                page.goto(url, wait_until="domcontentloaded")
-            except Error:
-                pass
-
-            error_heading = page.locator("#leftContent h2", has_text="Sorry, an error occurred while processing your request.")
-
-            if error_heading.count() > 0:
-                context.close()
-                return False
-
-            return True
 
 
     def authenticate_session(self, url):

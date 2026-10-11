@@ -23,7 +23,7 @@ shipper_city = os.environ["SHIPPER_CITY"]
 shipper_state_code= os.environ["SHIPPER_STATE_CODE"]
 shipper_postal_code= os.environ["SHIPPER_POSTAL_CODE"]
 shipper_country_code = os.environ["SHIPPER_COUNTRY_CODE"]
-shipper_is_residential = os.environ["SHIPPER_IS_RESIDENTIAL"].lower() == "true"
-shipper_full_name = os.environ["SHIPPER_FULL_NAME"]
+shipper_address_is_residential = os.environ["SHIPPER_ADDRESS_IS_RESIDENTIAL"].lower() == "true"
+shipper_name = os.environ["SHIPPER_NAME"]
 shipper_email_address = os.environ["SHIPPER_EMAIL_ADDRESS"]
-shipper_provided_phone_number = os.environ["SHIPPER_PHONE_NUMBER"]
+shipper_phone_number = os.environ["SHIPPER_PHONE_NUMBER"]

@@ -1,7 +1,6 @@
 from datetime import datetime
 from enum import StrEnum
 from pydantic import BaseModel, Field
-from private import recipient_default_phone_number
 
 
 class ServiceType(StrEnum):
@@ -35,64 +34,28 @@ class RatesOptions(BaseModel):
 
 
 class Address(BaseModel):
+    street_line_one: str | None
+    street_line_two: str | None
+    city: str | None
+    state_code: str | None
+    postal_code: str | None
+    country_code: str | None
+
+
+class InputData(BaseModel):
     street_line_one: str
     street_line_two: str | None = None
     city: str
     state_code: str
     postal_code: str
-    country_code: str = "US"
-    is_residential: bool
-
-    @property
-    def street_lines(self) -> list[str]:
-        lines = [self.street_line_one, self.street_line_two]
-        return [line for line in lines if line is not None]
-
-
-class ShippingContact(BaseModel):
-    address: Address
-    full_name: str
-    email_address: str
-    provided_phone_number: str | None = None
-
-    @property
-    def phone_number(self) -> str:
-        if not self.provided_phone_number:
-            return recipient_default_phone_number
-        return self.provided_phone_number
-
-
-class Shipment(BaseModel):
-    shipper: ShippingContact
-    recipient: ShippingContact
-    case_number: str | None = ""
-    asset_number: str | None = ""
-    default_service_type: ServiceType = ServiceType.FEDEX_EXPRESS_SAVER
-    selected_service_type: ServiceType | None = None
-    charge_code: str
-    shipment_weight: float = 10
-    other_emails_to_notify: list[str] = Field(default_factory=list)
-
-    @property
-    def service_type(self) -> ServiceType:
-        return self.selected_service_type or self.default_service_type
-
-
-class InputData(BaseModel):
-    address_line_one: str
-    address_line_two: str | None = None
-    city: str
-    state: str
-    zip_code: str
+    country_code: str
     name: str
-    email_address: str | None = ""
+    email_address: str
     phone_number: str
-    is_residential_address: bool
-    shipment_weight: float = 10
-    case_number: str | None = ""
-    asset_number: str | None = ""
+    address_is_commercial: bool
+    reference: str
+    shipment_weight: float
     other_emails_to_notify: list[str] = Field(default_factory=list)
-    selected_service_type: ServiceType | None
 
 
 class RequestPortalData(BaseModel):
@@ -109,3 +72,48 @@ class RequestPortalData(BaseModel):
     needed_by_date: str | None
     instructions: str | None
     others_to_notify: str | None
+
+
+class Shipment(BaseModel):
+    company_name: str
+    charge_code: str
+    account_number: str
+
+    shipper_address: Address
+    shipper_name: str
+    shipper_email_address: str
+    shipper_phone_number: str
+    shipper_address_is_residential: bool
+
+    recipient_address: Address | None
+    recipient_name: str
+    recipient_email_address: str
+    recipient_phone_number: str
+    recipient_address_is_residential: bool
+
+    other_emails_to_notify: list[str] = Field(default_factory=list)
+    shipment_weight: float
+    case_number: str
+    asset_number: str
+    selected_service_type: ServiceType | None = None
+
+    @property
+    def shipper_street_lines(self) -> list[str]:
+        lines = [self.shipper_address.street_line_one, self.shipper_address.street_line_two]
+        return [line for line in lines if line is not None]
+
+    @property
+    def recipient_street_lines(self) -> list[str]:
+        lines = [self.recipient_address.street_line_one, self.recipient_address.street_line_two]
+        return [line for line in lines if line is not None]
+
+    @property
+    def reference_number(self) -> str:
+        if self.case_number and self.asset_number:
+            return f"{self.case_number}_{self.asset_number}"
+        elif self.case_number:
+            return f"{self.case_number}"
+        elif self.asset_number:
+            return f"Asset_{self.asset_number}"
+        else:
+            return ""

@@ -1,4 +1,19 @@
-from private import company_name
+def build_address_validation_payload(address, account_number):
+    validation_schema = {
+        "addressesToValidate": [
+            {
+                "address": {
+                    "streetLines": [line for line in [address.street_line_one, address.street_line_two] if line is not None],
+                    "city": address.city,
+                    "stateOrProvinceCode": address.state_code,
+                    "postalCode": address.postal_code,
+                    "countryCode": address.country_code,
+                }
+            }
+        ]
+    }
+
+    return validation_schema
 
 
 def build_email_notifications_schema_list(shipment):
@@ -12,9 +27,9 @@ def build_email_notifications_schema_list(shipment):
 
     notifications_data = [
         {
-            "name": shipment.shipper.full_name,
+            "name": shipment.shipper_name,
             "emailNotificationRecipientType": "SHIPPER",
-            "emailAddress": shipment.shipper.email_address,
+            "emailAddress": shipment.shipper_email_address,
             "notificationEventType": notification_events_to_include,
             "notificationFormatType": "HTML",
             "notificationType": "EMAIL",
@@ -22,9 +37,9 @@ def build_email_notifications_schema_list(shipment):
         },
 
         {
-            "name": shipment.recipient.full_name,
+            "name": shipment.recipient_name,
             "emailNotificationRecipientType": "RECIPIENT",
-            "emailAddress": shipment.recipient.email_address,
+            "emailAddress": shipment.recipient_email_address,
             "notificationEventType": notification_events_to_include,
             "notificationFormatType": "HTML",
             "notificationType": "EMAIL",
@@ -56,34 +71,34 @@ def build_fedex_ship_payload(shipment, account_number):
         "requestedShipment": {
             "shipper": {
                 "address": {
-                    "streetLines": shipment.shipper.address.street_lines,
-                    "city": shipment.shipper.address.city,
-                    "stateOrProvinceCode": shipment.shipper.address.state_code,
-                    "postalCode": shipment.shipper.address.postal_code,
-                    "countryCode": shipment.shipper.address.country_code,
-                    "residential": shipment.shipper.address.is_residential,
+                    "streetLines": shipment.shipper_street_lines,
+                    "city": shipment.shipper_city,
+                    "stateOrProvinceCode": shipment.shipper_state_code,
+                    "postalCode": shipment.shipper_postal_code,
+                    "countryCode": shipment.shipper_country_code,
+                    "residential": shipment.shipper_address_is_residential,
                 },
                 "contact": {
-                    "personName": shipment.shipper.full_name,
-                    "emailAddress": shipment.shipper.email_address,
-                    "phoneNumber": shipment.shipper.phone_number,
-                    "companyName": company_name}
+                    "personName": shipment.shipper_name,
+                    "emailAddress": shipment.shipper_email_address,
+                    "phoneNumber": shipment.shipper_phone_number,
+                    "companyName": shipment.company_name}
             },
             "recipients": [
                 {
                     "address": {
-                        "streetLines": shipment.recipient.address.street_lines,
-                        "city": shipment.recipient.address.city,
-                        "stateOrProvinceCode": shipment.recipient.address.state_code,
-                        "postalCode": shipment.recipient.address.postal_code,
-                        "countryCode": shipment.recipient.address.country_code,
-                        "residential": shipment.recipient.address.is_residential,
+                        "streetLines": shipment.recipient_street_lines,
+                        "city": shipment.recipient_city,
+                        "stateOrProvinceCode": shipment.recipient_state_code,
+                        "postalCode": shipment.recipient_postal_code,
+                        "countryCode": shipment.recipient_country_code,
+                        "residential": shipment.recipient_address_is_residential,
                     },
                     "contact": {
-                        "personName": shipment.recipient.full_name,
-                        "emailAddress": shipment.recipient.email_address,
-                        "phoneNumber": shipment.recipient.phone_number,
-                        "companyName": company_name}
+                        "personName": shipment.recipient_name,
+                        "emailAddress": shipment.recipient_email_address,
+                        "phoneNumber": shipment.recipient_phone_number,
+                        "companyName": shipment.company_name}
                 }
             ],
             "pickupType": "DROPOFF_AT_FEDEX_LOCATION",
@@ -97,13 +112,13 @@ def build_fedex_ship_payload(shipment, account_number):
             "emailNotificationDetail": {
                 "aggregationType": "PER_SHIPMENT",
                 "emailNotificationRecipients": email_notifications_schema_list,
-                "personalMessage": "You have a FedEx package on the way!"
+                "personalMessage": "You have a FedEx package on the way Mr. Marnoshk Michaels!"
             },
             "labelSpecification": {"labelStockType": "PAPER_4X6", "imageType": "PDF", "labelFormatType": "COMMON2D"},
             "requestedPackageLineItems": [
                 {
                     "customerReferences": [
-                        {"customerReferenceType": "CUSTOMER_REFERENCE", "value": f"{shipment.case_number}_{shipment.asset_number}"},
+                        {"customerReferenceType": "CUSTOMER_REFERENCE", "value": shipment.reference_number},
                         {"customerReferenceType": "DEPARTMENT_NUMBER", "value": shipment.charge_code},
                     ],
                     "weight": {"units": "LB", "value": shipment.shipment_weight}
@@ -129,20 +144,20 @@ def build_fedex_rates_payload(shipment, account_number):
         "requestedShipment": {
             "shipper": {
                 "address": {
-                    "city": shipment.shipper.address.city,
-                    "stateOrProvinceCode": shipment.shipper.address.state_code,
-                    "postalCode": shipment.shipper.address.postal_code,
-                    "countryCode": shipment.shipper.address.country_code,
-                    "residential": shipment.shipper.address.is_residential,
+                    "city": shipment.shipper_city,
+                    "stateOrProvinceCode": shipment.shipper_state_code,
+                    "postalCode": shipment.shipper_postal_code,
+                    "countryCode": shipment.shipper_country_code,
+                    "residential": shipment.shipper_address_is_residential,
                 }
             },
             "recipient": {
                 "address": {
-                    "city": shipment.recipient.address.city,
-                    "stateOrProvinceCode": shipment.recipient.address.state_code,
-                    "postalCode": shipment.recipient.address.postal_code,
-                    "countryCode": shipment.recipient.address.country_code,
-                    "residential": shipment.recipient.address.is_residential,
+                    "city": shipment.recipient_city,
+                    "stateOrProvinceCode": shipment.recipient_state_code,
+                    "postalCode": shipment.recipient_postal_code,
+                    "countryCode": shipment.recipient_country_code,
+                    "residential": shipment.recipient_address_is_residential,
                 }
             },
             "pickupType": "DROPOFF_AT_FEDEX_LOCATION",

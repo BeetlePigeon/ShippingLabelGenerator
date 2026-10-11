@@ -7,4 +7,4 @@ class APIEnvironment(Enum):
 
 
 ## CONFIG PROJECT ENVIRONMENT HERE
-rates_API_config, ship_API_config = APIEnvironment.PRODUCTION, APIEnvironment.PRODUCTION
+rates_API_config, ship_API_config, validation_API_config = APIEnvironment.PRODUCTION, APIEnvironment.PRODUCTION, APIEnvironment.PRODUCTION

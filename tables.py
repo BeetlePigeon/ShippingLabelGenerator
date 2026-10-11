@@ -50,3 +50,5 @@ STATE_CODES = {
     "wisconsin": "WI",
     "wyoming": "WY",
 }
+
+state_codes = sorted(set(STATE_CODES.values()))

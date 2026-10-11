@@ -2,17 +2,17 @@ from schema_classes import InputData
 
 
 example_input = InputData(
-    address_line_one="308 Negra Arroyo Lane",
-    address_line_two="Apt 737",
+    street_line_one="308 Negra Arroyo Lane",
+    street_line_two="Apt 737",
     city="Albuquerque",
-    state="New Mexico",
-    zip_code="87104",
+    state_code="NM",
+    postal_code="87104",
+    country_code="US",
     name="Walter White",
     email_address="alborz796@gmail.com",
     phone_number="505-503-4455",
-    is_residential_address=False,
-    case_number="CASEREFNUM",
-    asset_number="ASSETREFNUM",
-    other_emails_to_notify=["alborzzzz@yahoo.com"],
-    selected_service_type=None,
+    address_is_commercial=False,
+    reference="REFNUM",
+    shipment_weight=10,
+    other_emails_to_notify=["alborzzzz@yahoo.com"]
 )
