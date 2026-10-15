@@ -8,6 +8,7 @@ class Parser:
     def __init__(self, gui):
         self.gui = gui
 
+
     @staticmethod
     def get_email_address_from(name_string: str) -> str:
         def d(string):
@@ -75,6 +76,7 @@ class Parser:
 
         return label_name, email_address
 
+
     @staticmethod
     def parse_contact_numbers(data) -> str:
         raw_phone = data["phone_number"]
@@ -91,7 +93,7 @@ class Parser:
 
 
     @staticmethod
-    def parse_others_to_notify(data):
+    def parse_others_to_notify(data) -> list[str]:
         parts = re.split("; ", data["others_to_notify"])
         others_to_notify = [part for part in parts]
         return others_to_notify
@@ -132,11 +134,11 @@ class Parser:
             })
 
             address = {
-                "street_line_one": address_parts[0].get('address1'),
-                "street_line_two": address_parts[0].get('address2'),
-                "city": address_parts[0].get('city'),
-                "state_code": address_parts[0].get('state'),
-                "postal_code": address_parts[0].get('zip_code'),
+                "street_line_one": address_parts[0].get('address1') or "",
+                "street_line_two": address_parts[0].get('address2') or "",
+                "city": address_parts[0].get('city') or "",
+                "state_code": address_parts[0].get('state') or "",
+                "postal_code": address_parts[0].get('zip_code') or "",
                 "country_code": "US"
             }
 

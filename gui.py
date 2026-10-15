@@ -3,10 +3,10 @@ from tkinter import ttk
 from scraper import Scraper
 from parser import Parser
 from tables import state_codes
-from private import sandbox_api_key, sandbox_secret_key, production_api_key, production_secret_key
+from private import sandbox_api_key, sandbox_secret_key, production_api_key, production_secret_key, rp_url_prefix
 from api_settings import APIEnvironment, rates_API_config, ship_API_config, validation_API_config
-from generator import get_access_token, build_shipment_data, attempt_address_completion, populate_rates_options, select_from_rates_options, create_label, save_label
-from schema_classes import InputData
+from api_requests import get_access_token, build_shipment_data, attempt_address_completion, populate_rates_options, select_from_rates_options, create_label, save_label
+from schema_classes import InputData, Address
 from input import example_input
 import json
 
@@ -22,20 +22,31 @@ class GUI:
         self.root = tkinter.Tk()
         self.root.title("FedEx Shipping Label Generator")
 
-        self.rp_frame = ttk.Frame(self.root)
-        self.rp_frame.grid(row=0, column=0, columnspan=2)
+        self.rp_outer_frame = ttk.Frame(self.root, padding=8, relief="solid", borderwidth=1)
+        self.rp_outer_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(15, 15))
 
-        self.rp_label = ttk.Label(self.rp_frame, text="RequestPortal number")
-        self.rp_label.grid(row=0, column=0, padx=5, pady=5)
+        self.rp_frame = ttk.Frame(self.rp_outer_frame)
+        self.rp_frame.pack()
 
-        validate_rp_number = lambda text: len(text) <= 6 and (text.isdigit() or text == "")
-        validate_command = (self.root.register(validate_rp_number), "%P")
+        self.rp_label = ttk.Label(self.rp_frame, text="RequestPortal Number",font=("Segoe UI", 11, "bold"))
+        self.rp_label.grid(row=0, column=0, columnspan=2, padx=1, pady=1)
 
-        self.rp_number_entry = ttk.Entry(self.rp_frame, width=10, validate="key", validatecommand=validate_command)
-        self.rp_number_entry.grid(row=0, column=1, padx=5, pady=5)
+        validate_command = (self.root.register(self.validate_rp_number), "%P")
 
-        self.load_shipment_details_button = ttk.Button(self.rp_frame, text="Load Shipment Details", command=self.load_shipment_details)
-        self.load_shipment_details_button.grid(row=0, column=2, pady=10, sticky="e")
+        rp_input_frame = ttk.Frame(self.rp_frame)
+        rp_input_frame.grid(row=1, column=0, padx=5, pady=5)
+
+        self.rp_number_entry = ttk.Entry(rp_input_frame, width=30, validate="key", validatecommand=validate_command)
+        self.rp_number_entry.pack(side="left")
+        self.rp_number_entry.bind("<<Paste>>", self.handle_rp_paste)
+
+        self.rp_paste_button = ttk.Button(rp_input_frame, text="📋", width=3, command=self.handle_rp_paste)
+        self.rp_paste_button.pack(side="left")
+
+        self.load_shipment_details_button = ttk.Button(self.rp_frame, text="Lookup", command=self.load_shipment_details)
+        self.load_shipment_details_button.grid(row=1, column=1)
+
+        self.rp_number_entry.bind("<Return>", lambda event: self.load_shipment_details_button.invoke())
 
         self.results_frame = ttk.Frame(self.root)
         self.results_frame.grid(row=1, column=0, columnspan=2, sticky="w")
@@ -46,7 +57,44 @@ class GUI:
         self.create_preshipment_sections()
 
         self.retrieve_rates_button = ttk.Button(self.root, text="Retrieve Rates", command=self.attempt_retrieve_rates)
-        self.retrieve_rates_button.grid(row=2, column=0, columnspan=2, pady=10)
+        self.retrieve_rates_button.grid(row=2, column=0, pady=10)
+
+        self.rp_error_label = ttk.Label(self.rp_scrape_status_frame, text="")
+        self.rp_error_label.grid(row=0, column=0, pady=5)
+
+        self.clear_shipment_details_button = ttk.Button(self.root, text="Clear All", command=self.clear_preshipment_sections)
+        self.clear_shipment_details_button.grid(row=2, column=1, padx=(15, 0), pady=10)
+
+
+    def validate_rp_number(self, text):
+        return len(text) <= 6 and (text.isascii() and text.isdigit() or text == "")
+
+
+    def extract_rp_number(self, text):
+        text = text.strip()
+
+        if text.startswith(rp_url_prefix):
+            text = text.removeprefix(rp_url_prefix)
+
+        if len(text) == 6 and text.isascii() and text.isdigit():
+            return text
+
+        return None
+
+
+    def handle_rp_paste(self, event=None):
+        pasted_text = self.root.clipboard_get().strip()
+
+        request_number = self.extract_rp_number(pasted_text)
+
+        if request_number is not None:
+            self.rp_number_entry.delete(0, tkinter.END)
+            self.rp_number_entry.insert(0, request_number)
+
+            return "break"
+
+        if pasted_text.startswith(rp_url_prefix):
+            return "break"
 
 
     def create_preshipment_sections(self):
@@ -81,23 +129,24 @@ class GUI:
         self.other_header = tkinter.Label(other_frame, text="Other", anchor="w", padx=8, pady=5, bg="#e6e6e6", font=("Segoe UI", 11, "bold"))
         self.other_header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
 
-        self.other_emails = tkinter.StringVar(value="")
         self.reference = tkinter.StringVar(value="")
         self.weight = tkinter.StringVar(value="")
+        self.other_emails = [tkinter.StringVar(value=""), tkinter.StringVar(value=""), tkinter.StringVar(value="")]
 
         fields = [
-            ("Other Email Recipients", self.other_emails),
             ("Reference #", self.reference),
             ("Weight (lbs)", self.weight),
+            ("Other Emails to Notify", self.other_emails[0]),
+            ("", self.other_emails[1]),
+            ("", self.other_emails[2]),
         ]
 
         for row, (field_name, field_value) in enumerate(fields):
             ttk.Label(other_frame, text=field_name).grid(row=row+1, column=0, sticky="w", padx=5, pady=4)
             ttk.Entry(other_frame, textvariable=field_value, width=55).grid(row=row+1, column=1, sticky="ew", padx=5, pady=4)
 
-
         address_frame = ttk.Frame(self.results_frame, padding=8, relief="solid", borderwidth=1)
-        address_frame.grid(row=0, column=1, sticky="nws")
+        address_frame.grid(row=0, column=1, sticky="news")
         address_frame.columnconfigure(1, weight=1)
 
         self.address_header = tkinter.Label(address_frame, text="Address", anchor="w", padx=8, pady=5, bg="#e6e6e6", font=("Segoe UI", 11, "bold"))
@@ -109,25 +158,59 @@ class GUI:
         self.state_code = tkinter.StringVar(value="")
         self.postal_code = tkinter.StringVar(value="")
         self.country_code = tkinter.StringVar(value="US")
-        self.address_is_commercial = tkinter.IntVar(value=0)
+        self.address_is_commercial = tkinter.IntVar(value=-1)
 
         ttk.Label(address_frame, text="Street line 1").grid(row=1, column=0, sticky="w", padx=5, pady=4)
         ttk.Entry(address_frame, textvariable=self.street_line_one, width=55).grid(row=1, column=1, sticky="ew", padx=5, pady=4)
         ttk.Label(address_frame, text="Street line 2").grid(row=2, column=0, sticky="w", padx=5, pady=4)
         ttk.Entry(address_frame, textvariable=self.street_line_two, width=55).grid(row=2, column=1, sticky="ew", padx=5, pady=4)
-        ttk.Label(address_frame, text="City").grid(row=3, column=0, sticky="w", padx=5, pady=4)
-        ttk.Entry(address_frame, textvariable=self.city, width=55).grid(row=3, column=1, sticky="w", padx=5, pady=4)
-        ttk.Label(address_frame, text="State").grid(row=4, column=0, sticky="w", padx=5, pady=4)
-        ttk.Combobox(address_frame, textvariable=self.state_code, values=state_codes, state="readonly", width=6).grid(row=4, column=1, sticky="w", padx=5, pady=4)
-        ttk.Label(address_frame, text="ZIP").grid(row=5, column=0, sticky="w", padx=5, pady=4)
-        ttk.Entry(address_frame, textvariable=self.postal_code, width=6).grid(row=5, column=1, sticky="w", padx=5, pady=4)
-        ttk.Label(address_frame, text="Country").grid(row=6, column=0, sticky="w", padx=5, pady=4)
-        ttk.Entry(address_frame, textvariable=self.country_code, width=6, state="disabled").grid(row=6, column=1, sticky="w", padx=5, pady=4)
-        ttk.Label(address_frame, text="Residential/Commercial address").grid(row=7, column=0, sticky="w", padx=5, pady=4)
-        residential_radiobutton = ttk.Radiobutton(address_frame, variable=self.address_is_commercial, text="Residential", value=0)
-        residential_radiobutton.grid(row=7, column=1, sticky="w", padx=5, pady=4)
-        commercial_radiobutton = ttk.Radiobutton(address_frame, variable=self.address_is_commercial, text="Commercial", value=1)
-        commercial_radiobutton.grid(row=8, column=1, sticky="w", padx=5, pady=4)
+
+        bottom_frame = ttk.Frame(address_frame)
+        bottom_frame.grid(row=3, column=0, columnspan=2, sticky="ew", padx=5, pady=8)
+        bottom_frame.columnconfigure(0, weight=1, uniform="bottom")
+        bottom_frame.columnconfigure(1, weight=1, uniform="bottom")
+
+        type_frame = ttk.Frame(bottom_frame)
+        type_frame.grid(row=0, column=0, sticky="w")
+
+        ttk.Label(type_frame, text="Residential").grid(row=0, column=0, sticky="w", pady=5)
+        ttk.Radiobutton(type_frame, variable=self.address_is_commercial, value=0).grid(row=0, column=1, sticky="w", padx=8)
+
+        ttk.Label(type_frame, text="Commercial").grid(row=1, column=0, sticky="w", pady=5)
+        ttk.Radiobutton(type_frame, variable=self.address_is_commercial, value=1).grid(row=1, column=1, sticky="w", padx=8)
+
+        location_frame = ttk.Frame(bottom_frame)
+        location_frame.grid(row=0, column=1, sticky="ew")
+        location_frame.columnconfigure(0, weight=1, uniform="location")
+        location_frame.columnconfigure(1, weight=1, uniform="location")
+
+        ttk.Label(location_frame, text="City").grid(row=0, column=0, columnspan=2, sticky="w")
+        ttk.Entry(location_frame, textvariable=self.city).grid(row=1, column=0, columnspan=2, sticky="ew", pady=(2,10))
+
+        ttk.Label(location_frame, text="State").grid(row=2, column=0, sticky="w")
+        ttk.Combobox(location_frame, textvariable=self.state_code, values=state_codes, state="readonly", width=6).grid(row=3, column=0, sticky="ew", padx=(0, 5), pady=2)
+
+        ttk.Label(location_frame, text="ZIP").grid(row=2, column=1, sticky="w", padx=(5, 0))
+        ttk.Entry(location_frame, textvariable=self.postal_code, width=10).grid(row=3, column=1, sticky="ew", padx=(5, 0), pady=2)
+
+
+    def clear_preshipment_sections(self):
+        self.recipient_name.set("")
+        self.recipient_email.set("")
+        self.recipient_phone.set("")
+
+        self.street_line_one.set("")
+        self.street_line_two.set("")
+        self.city.set("")
+        self.state_code.set("")
+        self.postal_code.set("")
+        self.address_is_commercial.set(-1)
+
+        self.reference.set("")
+        self.weight.set("")
+
+        for i in range(3):
+            self.other_emails[i].set("")
 
 
     @staticmethod
@@ -144,14 +227,14 @@ class GUI:
         url = f"https://requestportal.americansystems.com/Request/Request?id={request_number}"
 
         if not self.scraper.request_number_is_feasible(request_number):
-            ttk.Label(self.rp_frame, text="Invalid request. Please provide a valid RequestPortal request number.").grid(row=0, column=4, sticky="w", padx=5, pady=2)
+            self.rp_error_label.config(text="Invalid RequestPortal number.")
             return
 
         if not self.scraper.session_is_authenticated(url):
             self.scraper.authenticate_session(url)
 
         if not self.scraper.request_is_valid(url):
-            ttk.Label(self.rp_frame, text="Invalid request. Please provide a valid RequestPortal request number.").grid(row=0, column=4, sticky="w", padx=5, pady=2)
+            self.rp_error_label.config(text="Invalid RequestPortal number.")
             return
 
         rp_dict = self.scraper.scrape_request(url).model_dump()
@@ -160,20 +243,21 @@ class GUI:
 
 
     def display_preshipment_details(self, rp_dict):
+        self.clear_preshipment_sections()
         name, email = self.parser.parse_names(rp_dict)
         phone = self.parser.parse_contact_numbers(rp_dict)
 
         raw_address = self.parser.parse_address(rp_dict)
-        corrected_address = self.correct_address(raw_address)
-        print(corrected_address)
+        address, classification = self.correct_address(raw_address)
 
-        address = raw_address
-        address_is_commercial = True
+        if classification and classification == "RESIDENTIAL" or classification == "UNKNOWN":
+            address_is_commercial = False
+        else:
+            address_is_commercial = True
 
         other_emails = self.parser.parse_others_to_notify(rp_dict)
         reference = "CAS-35251_56262_802331"
         weight = 10
-
 
         self.recipient_name.set(name)
         self.recipient_email.set(email)
@@ -187,16 +271,42 @@ class GUI:
         self.country_code.set(value=address.country_code)
         self.address_is_commercial.set(value=address_is_commercial)
 
-        self.other_emails.set(";".join(other_emails))
         self.reference.set(value=reference)
         self.weight.set(value=str(weight))
 
+        for i in range(min(len(other_emails), 3)):
+            self.other_emails[i].set(other_emails[i])
+
 
     def correct_address(self, address):
-        response = attempt_address_completion(self.sandbox_token, self.production_token, address, validation_API_config)
-        x = response.json()["output"]["resolvedAddresses"][0]
-        y = json.dumps(x, indent=4)
-        print(y)
+        response = attempt_address_completion(self.sandbox_token, self.production_token, address, validation_API_config).json()["output"]["resolvedAddresses"][0]
+        pretty_json = json.dumps(response, indent=4)
+        print(pretty_json)
+
+        street_lines = response.get("streetLinesToken")
+        if street_lines:
+            street_line_one = street_lines[0]
+            if len(street_lines) == 1:
+                street_line_two = ""
+            else:
+                street_line_two = street_lines[1]
+        else:
+            street_line_one, street_line_two = "", ""
+
+        city = response.get("city") or ""
+        state_code = response.get("stateOrProvinceCode") or ""
+        postal_code = response.get("postalCode") or ""
+        country_code = response.get("countryCode") or ""
+        address_classification = response.get("classification") or ""
+
+        return Address(
+            street_line_one=street_line_one,
+            street_line_two=street_line_two,
+            city=city,
+            state_code=state_code,
+            postal_code=postal_code,
+            country_code=country_code
+        ), address_classification
 
 
     def build_shipment(self):
@@ -213,7 +323,7 @@ class GUI:
             address_is_commercial=bool(self.address_is_commercial.get()),
             reference=self.reference.get(),
             shipment_weight=int(self.weight.get()),
-            other_emails_to_notify=self.other_emails.get().split(";"),
+            other_emails_to_notify=[email.get().strip() for email in self.other_emails if email.get().strip()],
         )
 
         return shipment

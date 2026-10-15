@@ -34,12 +34,12 @@ class RatesOptions(BaseModel):
 
 
 class Address(BaseModel):
-    street_line_one: str | None
-    street_line_two: str | None
-    city: str | None
-    state_code: str | None
-    postal_code: str | None
-    country_code: str | None
+    street_line_one: str
+    street_line_two: str
+    city: str
+    state_code: str
+    postal_code: str
+    country_code: str
 
 
 class InputData(BaseModel):

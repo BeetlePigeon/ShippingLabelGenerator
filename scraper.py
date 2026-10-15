@@ -1,6 +1,5 @@
 from playwright.sync_api import sync_playwright, Error
 from pathlib import Path
-from private import rp_url_prefix
 from schema_classes import RequestPortalData
 
 
@@ -52,7 +51,14 @@ class Scraper:
                 context.close()
                 return False
 
-            return True
+            shipping_fields = ("Address:", "Others to Notify:")
+
+            has_shipping_fields = all(
+                page.locator("span.greyText", has_text=field).count() > 0
+                for field in shipping_fields
+            )
+
+            return has_shipping_fields
 
 
     def session_is_authenticated(self, url):
