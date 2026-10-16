@@ -22,48 +22,98 @@ class GUI:
         self.root = tkinter.Tk()
         self.root.title("FedEx Shipping Label Generator")
 
-        self.rp_outer_frame = ttk.Frame(self.root, padding=8, relief="solid", borderwidth=1)
-        self.rp_outer_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(15, 15))
+        self.configure_styles()
 
-        self.rp_frame = ttk.Frame(self.rp_outer_frame)
-        self.rp_frame.pack()
+        self.main_frame = ttk.Frame(self.root, padding=(22, 18, 22, 12))
+        self.main_frame.pack(fill="both", expand=True)
+        self.main_frame.columnconfigure(0, weight=1)
 
-        self.rp_label = ttk.Label(self.rp_frame, text="RequestPortal Number",font=("Segoe UI", 11, "bold"))
-        self.rp_label.grid(row=0, column=0, columnspan=2, padx=1, pady=1)
+        title_frame = ttk.Frame(self.main_frame)
+        title_frame.grid(row=0, column=0, sticky="ew", pady=(0, 15))
+
+        tkinter.Label(title_frame, text="Fe", bg="#623a9d", fg="white", font=("Segoe UI", 14, "bold"), padx=9, pady=6).pack(side="left", padx=(0, 12))
+        ttk.Label(title_frame, text="FedEx Shipping Label Generator", font=("Segoe UI", 17, "bold")).pack(side="left")
+
+        self.rp_outer_frame = ttk.Frame(self.main_frame, padding=4, style="Card.TFrame")
+        self.rp_outer_frame.grid(row=1, column=0, sticky="ew", pady=(0, 15))
+        self.rp_outer_frame.columnconfigure(0, weight=1)
+
+        self.rp_label = tkinter.Label(self.rp_outer_frame, text="Request Portal", anchor="w", padx=12, pady=9, bg=self.colors["muted"], fg=self.colors["ink"], font=("Segoe UI", 12, "bold"))
+        self.rp_label.grid(row=0, column=0, sticky="ew", pady=(0, 12))
+
+        self.rp_frame = ttk.Frame(self.rp_outer_frame, style="CardInterior.TFrame")
+        self.rp_frame.grid(row=1, column=0)
+        ttk.Label(self.rp_frame, text="RP Number", style="Card.TLabel").pack(side="left", padx=(0, 12))
 
         validate_command = (self.root.register(self.validate_rp_number), "%P")
 
-        rp_input_frame = ttk.Frame(self.rp_frame)
-        rp_input_frame.grid(row=1, column=0, padx=5, pady=5)
-
-        self.rp_number_entry = ttk.Entry(rp_input_frame, width=30, validate="key", validatecommand=validate_command)
+        self.rp_number_entry = ttk.Entry(self.rp_frame, width=17, validate="key", validatecommand=validate_command)
         self.rp_number_entry.pack(side="left")
         self.rp_number_entry.bind("<<Paste>>", self.handle_rp_paste)
 
-        self.rp_paste_button = ttk.Button(rp_input_frame, text="📋", width=3, command=self.handle_rp_paste)
-        self.rp_paste_button.pack(side="left")
+        self.rp_paste_button = ttk.Button(self.rp_frame, text="Paste", command=self.handle_rp_paste)
+        self.rp_paste_button.pack(side="left", padx=(2, 12))
 
-        self.load_shipment_details_button = ttk.Button(self.rp_frame, text="Lookup", command=self.load_shipment_details)
-        self.load_shipment_details_button.grid(row=1, column=1)
+        self.load_shipment_details_button = ttk.Button(self.rp_frame, text="Lookup", style="Primary.TButton", command=self.load_shipment_details)
+        self.load_shipment_details_button.pack(side="left")
 
         self.rp_number_entry.bind("<Return>", lambda event: self.load_shipment_details_button.invoke())
 
-        self.results_frame = ttk.Frame(self.root)
-        self.results_frame.grid(row=1, column=0, columnspan=2, sticky="w")
+        self.rp_error_label = ttk.Label(self.rp_outer_frame, text="", style="Error.TLabel")
+        self.rp_error_label.grid(row=2, column=0, pady=(5, 0))
 
-        self.rp_scrape_status_frame = ttk.Frame(self.root)
-        self.rp_scrape_status_frame.grid(row=1, column=1, sticky="w")
-
+        self.results_frame = ttk.Frame(self.main_frame)
+        self.results_frame.grid(row=2, column=0, sticky="nsew")
+        self.results_frame.columnconfigure(0, weight=1, uniform="form")
+        self.results_frame.columnconfigure(1, weight=1, uniform="form")
         self.create_preshipment_sections()
 
-        self.retrieve_rates_button = ttk.Button(self.root, text="Retrieve Rates", command=self.attempt_retrieve_rates)
-        self.retrieve_rates_button.grid(row=2, column=0, pady=10)
+        action_frame = ttk.Frame(self.main_frame)
+        action_frame.grid(row=3, column=0, pady=(8, 0))
 
-        self.rp_error_label = ttk.Label(self.rp_scrape_status_frame, text="")
-        self.rp_error_label.grid(row=0, column=0, pady=5)
+        self.retrieve_rates_button = ttk.Button(action_frame, text="Retrieve Rates", style="Primary.TButton", command=self.attempt_retrieve_rates)
+        self.retrieve_rates_button.pack(side="left", padx=7)
 
-        self.clear_shipment_details_button = ttk.Button(self.root, text="Clear All", command=self.clear_preshipment_sections)
-        self.clear_shipment_details_button.grid(row=2, column=1, padx=(15, 0), pady=10)
+        self.clear_shipment_details_button = ttk.Button(action_frame, text="Clear All", command=self.clear_preshipment_sections)
+        self.clear_shipment_details_button.pack(side="left", padx=7)
+
+
+    def configure_styles(self):
+        self.colors = {
+            "bg": "#eff3f9",
+            "surface": "#ffffff",
+            "muted": "#e9eff7",
+            "border": "#ccd8e6",
+            "ink": "#263449",
+            "subtitle": "#67798f",
+            "primary": "#4878b7"
+        }
+        c = self.colors
+        self.root.configure(bg=c["bg"])
+        style = ttk.Style(self.root)
+        style.theme_use("clam")
+
+        style.configure("TFrame", background=c["bg"])
+        style.configure("Card.TFrame", background=c["surface"], relief="solid", borderwidth=1, bordercolor=c["border"])
+        style.configure("CardInterior.TFrame", background=c["surface"], borderwidth=0, relief="flat")
+        style.configure("TLabel", background=c["bg"], foreground=c["ink"], font=("Segoe UI", 10))
+        style.configure("Card.TLabel", background=c["surface"], foreground=c["ink"], font=("Segoe UI", 10))
+        style.configure("Hint.TLabel", background=c["surface"], foreground=c["subtitle"], font=("Segoe UI", 9))
+        style.configure("Error.TLabel", background=c["surface"], foreground="#b42318", font=("Segoe UI", 10))
+
+        style.configure("TEntry", fieldbackground="white", bordercolor=c["border"], lightcolor=c["border"], darkcolor=c["border"], relief="flat", borderwidth=1, padding=4, font=("Segoe UI", 10))
+        style.map("TEntry", bordercolor=[("focus", "#80a7d6")])
+
+        style.configure("TCombobox", fieldbackground="white", background="eaf0f8", bordercolor=c["border"], lightcolor=c["border"], darkcolor=c["border"], padding=4, font=("Segoe UI", 10))
+        style.map("TCombobox", fieldbackground=[("readonly", "white")])
+
+        style.configure("TButton", background="#e9f0f8", foreground=c["ink"], borderwidth=1, relief="flat", bordercolor=c["border"], padding=(10, 5), font=("Segoe UI", 10))
+        style.map("TButton", background=[("active", "#d7e6f5")])
+
+        style.configure("Primary.TButton", background=c["primary"], foreground="white", bordercolor=c["primary"], padding=(14, 5), font=("Segoe UI", 10, "bold"))
+        style.map("Primary.TButton", background=[("active", "#3968a5")], foreground=[("active", "white")])
+
+        style.configure("Card.TRadiobutton", background="white", foreground=c["ink"], font=("Segoe UI", 10))
 
 
     def validate_rp_number(self, text):
@@ -99,14 +149,15 @@ class GUI:
 
     def create_preshipment_sections(self):
         left_column = ttk.Frame(self.results_frame)
-        left_column.grid(row=0, column=0, sticky="nw", padx=(0, 8))
+        left_column.grid(row=0, column=0, sticky="nsew", padx=(0, 7))
+        left_column.columnconfigure(0, weight=1)
 
-        recipient_frame = ttk.Frame(left_column, padding=8, relief="solid", borderwidth=1)
+        recipient_frame = ttk.Frame(left_column, padding=4, style="Card.TFrame")
         recipient_frame.grid(row=0, column=0, sticky="ew")
         recipient_frame.columnconfigure(1, weight=1)
 
-        self.recipient_header = tkinter.Label(recipient_frame, text="Recipient", anchor="w", padx=8, pady=5, bg="#e6e6e6", font=("Segoe UI", 11, "bold"))
-        self.recipient_header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
+        self.recipient_header = tkinter.Label(recipient_frame, text="Recipient", anchor="w", padx=12, pady=2, bg=self.colors["muted"], fg=self.colors["ink"], font=("Segoe UI", 12, "bold"))
+        self.recipient_header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 12))
 
         self.recipient_name = tkinter.StringVar(value="")
         self.recipient_email = tkinter.StringVar(value="")
@@ -119,15 +170,15 @@ class GUI:
         ]
 
         for row, (field_name, field_value) in enumerate(fields):
-            ttk.Label(recipient_frame, text=field_name).grid(row=row+1, column=0, sticky="w", padx=5, pady=4)
-            ttk.Entry(recipient_frame, textvariable=field_value, width=55).grid(row=row+1, column=1, sticky="ew", padx=5, pady=4)
+            ttk.Label(recipient_frame, style="Card.TLabel", text=field_name).grid(row=row+1, column=0, sticky="w", padx=5, pady=3)
+            ttk.Entry(recipient_frame, textvariable=field_value, width=36).grid(row=row+1, column=1, sticky="ew", padx=5, pady=3)
 
-        other_frame = ttk.Frame(left_column, padding=8, relief="solid", borderwidth=1)
+        other_frame = ttk.Frame(left_column, padding=4, style="Card.TFrame")
         other_frame.grid(row=1, column=0, sticky="ew")
         other_frame.columnconfigure(1, weight=1)
 
-        self.other_header = tkinter.Label(other_frame, text="Other", anchor="w", padx=8, pady=5, bg="#e6e6e6", font=("Segoe UI", 11, "bold"))
-        self.other_header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
+        self.other_header = tkinter.Label(other_frame, text="Other", anchor="w", padx=12, pady=2, bg=self.colors["muted"], fg=self.colors["ink"], font=("Segoe UI", 12, "bold"))
+        self.other_header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 12))
 
         self.reference = tkinter.StringVar(value="")
         self.weight = tkinter.StringVar(value="")
@@ -142,15 +193,15 @@ class GUI:
         ]
 
         for row, (field_name, field_value) in enumerate(fields):
-            ttk.Label(other_frame, text=field_name).grid(row=row+1, column=0, sticky="w", padx=5, pady=4)
-            ttk.Entry(other_frame, textvariable=field_value, width=55).grid(row=row+1, column=1, sticky="ew", padx=5, pady=4)
+            ttk.Label(other_frame, style="Card.TLabel", text=field_name).grid(row=row+1, column=0, sticky="w", padx=5, pady=3)
+            ttk.Entry(other_frame, textvariable=field_value, width=36).grid(row=row+1, column=1, sticky="ew", padx=5, pady=3)
 
-        address_frame = ttk.Frame(self.results_frame, padding=8, relief="solid", borderwidth=1)
-        address_frame.grid(row=0, column=1, sticky="news")
+        address_frame = ttk.Frame(self.results_frame, padding=4, style="Card.TFrame")
+        address_frame.grid(row=0, column=1, sticky="nsew", padx=(7, 0))
         address_frame.columnconfigure(1, weight=1)
 
-        self.address_header = tkinter.Label(address_frame, text="Address", anchor="w", padx=8, pady=5, bg="#e6e6e6", font=("Segoe UI", 11, "bold"))
-        self.address_header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
+        self.address_header = tkinter.Label(address_frame, text="Address", anchor="w", padx=12, pady=2, bg=self.colors["muted"], fg=self.colors["ink"], font=("Segoe UI", 12, "bold"))
+        self.address_header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 12))
 
         self.street_line_one = tkinter.StringVar(value="")
         self.street_line_two = tkinter.StringVar(value="")
@@ -160,38 +211,40 @@ class GUI:
         self.country_code = tkinter.StringVar(value="US")
         self.address_is_commercial = tkinter.IntVar(value=-1)
 
-        ttk.Label(address_frame, text="Street line 1").grid(row=1, column=0, sticky="w", padx=5, pady=4)
-        ttk.Entry(address_frame, textvariable=self.street_line_one, width=55).grid(row=1, column=1, sticky="ew", padx=5, pady=4)
-        ttk.Label(address_frame, text="Street line 2").grid(row=2, column=0, sticky="w", padx=5, pady=4)
-        ttk.Entry(address_frame, textvariable=self.street_line_two, width=55).grid(row=2, column=1, sticky="ew", padx=5, pady=4)
+        ttk.Label(address_frame, style="Card.TLabel", text="Street line 1").grid(row=1, column=0, sticky="w", padx=5, pady=4)
+        ttk.Entry(address_frame, textvariable=self.street_line_one, width=36).grid(row=1, column=1, sticky="ew", padx=5, pady=4)
+        ttk.Label(address_frame, style="Card.TLabel", text="Street line 2").grid(row=2, column=0, sticky="w", padx=5, pady=4)
+        ttk.Entry(address_frame, textvariable=self.street_line_two, width=36).grid(row=2, column=1, sticky="ew", padx=5, pady=4)
 
-        bottom_frame = ttk.Frame(address_frame)
+        bottom_frame = ttk.Frame(address_frame, style="CardInterior.TFrame")
         bottom_frame.grid(row=3, column=0, columnspan=2, sticky="ew", padx=5, pady=8)
         bottom_frame.columnconfigure(0, weight=1, uniform="bottom")
         bottom_frame.columnconfigure(1, weight=1, uniform="bottom")
 
-        type_frame = ttk.Frame(bottom_frame)
+        type_frame = ttk.Frame(bottom_frame, style="CardInterior.TFrame")
         type_frame.grid(row=0, column=0, sticky="w")
 
-        ttk.Label(type_frame, text="Residential").grid(row=0, column=0, sticky="w", pady=5)
-        ttk.Radiobutton(type_frame, variable=self.address_is_commercial, value=0).grid(row=0, column=1, sticky="w", padx=8)
+        ttk.Label(type_frame, style="Card.TLabel", text="Residential").grid(row=0, column=0, sticky="w", pady=3)
+        ttk.Radiobutton(type_frame, style="Card.TRadiobutton", variable=self.address_is_commercial, value=0).grid(row=0, column=1, sticky="w", padx=8)
 
-        ttk.Label(type_frame, text="Commercial").grid(row=1, column=0, sticky="w", pady=5)
-        ttk.Radiobutton(type_frame, variable=self.address_is_commercial, value=1).grid(row=1, column=1, sticky="w", padx=8)
+        ttk.Label(type_frame, style="Card.TLabel", text="Commercial").grid(row=1, column=0, sticky="w", pady=3)
+        ttk.Radiobutton(type_frame, style="Card.TRadiobutton", variable=self.address_is_commercial, value=1).grid(row=1, column=1, sticky="w", padx=8)
 
-        location_frame = ttk.Frame(bottom_frame)
+        location_frame = ttk.Frame(bottom_frame, style="CardInterior.TFrame")
         location_frame.grid(row=0, column=1, sticky="ew")
         location_frame.columnconfigure(0, weight=1, uniform="location")
         location_frame.columnconfigure(1, weight=1, uniform="location")
 
-        ttk.Label(location_frame, text="City").grid(row=0, column=0, columnspan=2, sticky="w")
+        ttk.Label(location_frame, style="Card.TLabel", text="City").grid(row=0, column=0, columnspan=2, sticky="w")
         ttk.Entry(location_frame, textvariable=self.city).grid(row=1, column=0, columnspan=2, sticky="ew", pady=(2,10))
 
-        ttk.Label(location_frame, text="State").grid(row=2, column=0, sticky="w")
+        ttk.Label(location_frame, style="Card.TLabel", text="State").grid(row=2, column=0, sticky="w")
         ttk.Combobox(location_frame, textvariable=self.state_code, values=state_codes, state="readonly", width=6).grid(row=3, column=0, sticky="ew", padx=(0, 5), pady=2)
 
-        ttk.Label(location_frame, text="ZIP").grid(row=2, column=1, sticky="w", padx=(5, 0))
+        ttk.Label(location_frame, style="Card.TLabel", text="ZIP").grid(row=2, column=1, sticky="w", padx=(5, 0))
         ttk.Entry(location_frame, textvariable=self.postal_code, width=10).grid(row=3, column=1, sticky="ew", padx=(5, 0), pady=2)
+
+        ttk.Label(address_frame, text="Country: US", style="Hint.TLabel").grid(row=4, column=0, columnspan=2, sticky="w", pady=(22, 2))
 
 
     def clear_preshipment_sections(self):
