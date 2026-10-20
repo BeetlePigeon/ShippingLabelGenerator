@@ -1,4 +1,5 @@
 import tkinter
+import re
 from tkinter import ttk
 from scraper import Scraper
 from parser import Parser
@@ -10,6 +11,7 @@ from schema_classes import InputData, Address
 from input import example_input
 from PIL import Image, ImageTk
 from pathlib import Path
+from sample_inputs import test_requests
 import json
 
 
@@ -66,7 +68,7 @@ class GUI:
         rp_controls_frame = ttk.Frame(self.rp_frame, style="CardInterior.TFrame")
         rp_controls_frame.pack()
 
-        validate_command = (self.root.register(self.validate_rp_number), "%P")
+        validate_command = (self.root.register(self.validate_rp_number_entry), "%P")
 
         self.rp_number_entry = ttk.Entry(rp_controls_frame, width=26, validate="key", validatecommand=validate_command)
         self.rp_number_entry.pack(side="left")
@@ -154,37 +156,6 @@ class GUI:
         style.configure("Card.TRadiobutton", background="white", foreground=c["ink"], font=("Segoe UI", 10))
 
 
-    def validate_rp_number(self, text):
-        return len(text) <= 6 and (text.isascii() and text.isdigit() or text == "")
-
-
-    def extract_rp_number(self, text):
-        text = text.strip()
-
-        if text.startswith(rp_url_prefix):
-            text = text.removeprefix(rp_url_prefix)
-
-        if len(text) == 6 and text.isascii() and text.isdigit():
-            return text
-
-        return None
-
-
-    def handle_rp_paste(self, event=None):
-        pasted_text = self.root.clipboard_get().strip()
-
-        request_number = self.extract_rp_number(pasted_text)
-
-        if request_number is not None:
-            self.rp_number_entry.delete(0, tkinter.END)
-            self.rp_number_entry.insert(0, request_number)
-
-            return "break"
-
-        if pasted_text.startswith(rp_url_prefix):
-            return "break"
-
-
     def create_field_label(self, parent, text, row, column=0, required=False, padx=5, pady=3):
         label_frame = ttk.Frame(parent, style="CardInterior.TFrame")
         label_frame.grid(row=row, column=column, sticky="w", padx=padx, pady=pady)
@@ -217,7 +188,8 @@ class GUI:
         ttk.Entry(recipient_frame, textvariable=self.recipient_email, width=36).grid(row=2, column=1, sticky="ew", padx=5, pady=3)
 
         self.create_field_label(recipient_frame, "Phone", 3, required=False)
-        ttk.Entry(recipient_frame, textvariable=self.recipient_phone, width=36).grid(row=3, column=1, sticky="ew", padx=5, pady=3)
+        phone_validation = (self.root.register(self.validate_phone_entry), "%P")
+        ttk.Entry(recipient_frame, textvariable=self.recipient_phone, width=36, validate="key", validatecommand=phone_validation).grid(row=3, column=1, sticky="ew", padx=5, pady=3)
 
         other_frame = ttk.Frame(left_column, padding=4, style="Card.TFrame")
         other_frame.grid(row=1, column=0, sticky="ew")
@@ -238,9 +210,13 @@ class GUI:
             ("", self.other_emails[2]),
         ]
 
+        weight_validation = (self.root.register(self.validate_weight_entry), "%P")
         for row, (field_name, field_value) in enumerate(fields):
-            ttk.Label(other_frame, style="Card.TLabel", text=field_name).grid(row=row+1, column=0, sticky="w", padx=5, pady=3)
-            ttk.Entry(other_frame, textvariable=field_value, width=36).grid(row=row+1, column=1, sticky="ew", padx=5, pady=3)
+            ttk.Label(other_frame, style="Card.TLabel", text=field_name).grid(row=row + 1, column=0, sticky="w", padx=5, pady=3)
+            entry = ttk.Entry(other_frame, textvariable=field_value, width=36)
+            if field_name == "Weight (lbs)":
+                entry.configure(validate="key", validatecommand=weight_validation)
+            entry.grid(row=row+1, column=1, sticky="ew", padx=5, pady=3)
 
         address_frame = ttk.Frame(self.results_frame, padding=4, style="Card.TFrame")
         address_frame.grid(row=0, column=1, sticky="nsew", padx=(7, 0))
@@ -254,7 +230,6 @@ class GUI:
         self.city = tkinter.StringVar(value="")
         self.state_code = tkinter.StringVar(value="")
         self.postal_code = tkinter.StringVar(value="")
-        self.country_code = tkinter.StringVar(value="US")
         self.address_is_commercial = tkinter.IntVar(value=-1)
 
         self.create_field_label(address_frame, "Street line 1", row=1, required=True, pady=4)
@@ -289,7 +264,60 @@ class GUI:
         ttk.Combobox(location_frame, textvariable=self.state_code, values=state_codes, state="readonly", width=6).grid(row=3, column=0, sticky="ew", padx=(0, 5), pady=2)
 
         self.create_field_label(location_frame, "ZIP", row=2, column=1, required=True, padx=(5, 0), pady=0)
-        ttk.Entry(location_frame, textvariable=self.postal_code, width=10).grid(row=3, column=1, sticky="ew", padx=(5, 0), pady=2)
+        zip_validation = (self.root.register(self.validate_zip_entry), "%P")
+        ttk.Entry(location_frame, textvariable=self.postal_code, width=10, validate="key", validatecommand=zip_validation).grid(row=3, column=1, sticky="ew", padx=(5, 0), pady=2)
+
+
+    @staticmethod
+    def validate_rp_number_entry(text: str) -> bool:
+        return len(text) <= 6 and (text.isascii() and text.isdigit() or text == "")
+
+
+    @staticmethod
+    def validate_phone_entry(text: str) -> bool:
+        return all(char in "0123456789.-_()+" for char in text)
+
+
+    @staticmethod
+    def validate_weight_entry(text: str) -> bool:
+        return text.count(".") <= 1 and all(char in "0123456789." for char in text)
+
+
+    @staticmethod
+    def validate_zip_entry(text: str) -> bool:
+        numbers = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+        if not text:
+            return True
+        if all(char in "0123456789-" for char in text) and text.startswith(tuple(numbers)) and text.count("-") <= 1:
+            return True
+        return False
+
+
+    def extract_rp_number(self, text: str) -> str | None:
+        text = text.strip()
+
+        if text.startswith(rp_url_prefix):
+            text = text.removeprefix(rp_url_prefix)
+
+        if len(text) == 6 and text.isascii() and text.isdigit():
+            return text
+
+        return None
+
+
+    def handle_rp_paste(self, event=None):
+        pasted_text = self.root.clipboard_get().strip()
+
+        request_number = self.extract_rp_number(pasted_text)
+
+        if request_number is not None:
+            self.rp_number_entry.delete(0, tkinter.END)
+            self.rp_number_entry.insert(0, request_number)
+
+            return "break"
+
+        if pasted_text.startswith(rp_url_prefix):
+            return "break"
 
 
     def clear_preshipment_sections(self):
@@ -311,17 +339,15 @@ class GUI:
             self.other_emails[i].set("")
 
 
-    @staticmethod
-    def field_is_valid(field) -> bool:
-        pass
+    def load_shipment_details(self, test_case=None):
+        if test_case:
+            request_number = test_case
+        else:
+            request_number = self.rp_number_entry.get().strip()
+            if request_number == "123123":
+                self.run_load_shipment_test_cases()
+                return
 
-
-    def validate_shipment(self):
-        self.field_is_valid(self.street_line_one.get())
-
-
-    def load_shipment_details(self):
-        request_number = self.rp_number_entry.get().strip()
         url = f"https://requestportal.americansystems.com/Request/Request?id={request_number}"
 
         if not self.scraper.request_number_is_feasible(request_number):
@@ -337,50 +363,124 @@ class GUI:
 
         rp_dict = self.scraper.scrape_request(url).model_dump()
 
-        self.display_preshipment_details(rp_dict)
-
-
-    def display_preshipment_details(self, rp_dict):
         self.clear_preshipment_sections()
+
         name, email = self.parser.parse_names(rp_dict)
         phone = self.parser.parse_contact_numbers(rp_dict)
 
         raw_address = self.parser.parse_address(rp_dict)
-        address, classification = self.correct_address(raw_address)
+        address_check_response = self.request_address_validation(
+            raw_address.street_line_one,
+            raw_address.street_line_two,
+            raw_address.city,
+            raw_address.state_code,
+            raw_address.postal_code
+        )
 
-        if classification and classification == "RESIDENTIAL" or classification == "UNKNOWN":
-            address_is_commercial = False
-        else:
-            address_is_commercial = True
+        normalized_address = self.address_from_response(address_check_response)
+        address_classification = self.classification_from_response(address_check_response)
 
+        reference = "PLACEHOLDER"
+        weight = 6.9
         other_emails = self.parser.parse_others_to_notify(rp_dict)
-        reference = "CAS-35251_56262_802331"
-        weight = 10
 
         self.recipient_name.set(name)
         self.recipient_email.set(email)
         self.recipient_phone.set(phone)
 
-        self.street_line_one.set(address.street_line_one)
-        self.street_line_two.set(address.street_line_two)
-        self.city.set(value=address.city)
-        self.state_code.set(value=address.state_code)
-        self.postal_code.set(value=address.postal_code)
-        self.country_code.set(value=address.country_code)
-        self.address_is_commercial.set(value=address_is_commercial)
+        self.street_line_one.set(normalized_address.street_line_one)
+        self.street_line_two.set(normalized_address.street_line_two)
+        self.city.set(normalized_address.city)
+        self.state_code.set(normalized_address.state_code)
+        self.postal_code.set(normalized_address.postal_code)
+        self.address_is_commercial.set(address_classification)
 
-        self.reference.set(value=reference)
-        self.weight.set(value=str(weight))
+        self.reference.set(reference)
+        self.weight.set(str(weight))
 
         for i in range(min(len(other_emails), 3)):
             self.other_emails[i].set(other_emails[i])
 
 
-    def correct_address(self, address):
-        response = attempt_address_completion(self.sandbox_token, self.production_token, address, validation_API_config).json()["output"]["resolvedAddresses"][0]
+    @staticmethod
+    def pretty_print(response):
         pretty_json = json.dumps(response, indent=4)
         print(pretty_json)
 
+
+    @staticmethod
+    def required_text_is_valid(text: str) -> bool:
+        return bool(text)
+
+
+    @staticmethod
+    def name_is_valid(text: str) -> bool:
+        return bool(text)
+
+
+    @staticmethod
+    def email_is_valid(text: str) -> bool:
+        email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+        if not text or re.fullmatch(email_regex, text):
+            return True
+        return False
+
+
+    @staticmethod
+    def phone_is_valid(text: str) -> bool:
+        cleaned = re.sub(r'\D', '', text)
+        return not text or len(cleaned) == 10 or (len(cleaned) == 11 and cleaned.startswith("1"))
+
+
+    @staticmethod
+    def reference_is_valid(text: str) -> bool:
+        return not text or len(text) <= 24
+
+
+    @staticmethod
+    def weight_is_valid(weight: str) -> bool:
+        return (not weight or
+                any(char.isdigit() for char in weight)
+                and 0 < float(weight) <= 20
+        )
+
+
+    @staticmethod
+    def state_is_valid(selection) -> bool:
+        return selection in state_codes
+
+
+    @staticmethod
+    def build_address(street_line_one, street_line_two, city, state_code, postal_code):
+        return Address(
+            street_line_one=street_line_one or "",
+            street_line_two=street_line_two or "",
+            city=city or "",
+            state_code=state_code or "",
+            postal_code=postal_code or "",
+        )
+
+
+    def build_shipment(self):
+        shipment = InputData(
+            street_line_one=self.street_line_one.get(),
+            street_line_two=self.street_line_two.get(),
+            city=self.city.get(),
+            state_code=self.state_code.get(),
+            postal_code=self.postal_code.get(),
+            name=self.recipient_name.get(),
+            email_address=self.recipient_email.get(),
+            phone_number=self.recipient_phone.get(),
+            address_is_commercial=bool(self.address_is_commercial.get()),
+            reference=self.reference.get(),
+            shipment_weight=float(self.weight.get()),
+            other_emails_to_notify=[email.get().strip() for email in self.other_emails if email.get().strip()],
+        )
+
+        return shipment
+
+
+    def address_from_response(self, response):
         street_lines = response.get("streetLinesToken")
         if street_lines:
             street_line_one = street_lines[0]
@@ -391,59 +491,144 @@ class GUI:
         else:
             street_line_one, street_line_two = "", ""
 
-        city = response.get("city") or ""
-        state_code = response.get("stateOrProvinceCode") or ""
-        postal_code = response.get("postalCode") or ""
-        country_code = response.get("countryCode") or ""
-        address_classification = response.get("classification") or ""
+        city = response.get("city")
+        state_code = response.get("stateOrProvinceCode")
+        postal_code = response.get("postalCode")
 
-        return Address(
-            street_line_one=street_line_one,
-            street_line_two=street_line_two,
-            city=city,
-            state_code=state_code,
-            postal_code=postal_code,
-            country_code=country_code
-        ), address_classification
-
-
-    def build_shipment(self):
-        shipment = InputData(
-            street_line_one=self.street_line_one.get(),
-            street_line_two=self.street_line_two.get(),
-            city=self.city.get(),
-            state_code=self.state_code.get(),
-            postal_code=self.postal_code.get(),
-            country_code=self.country_code.get(),
-            name=self.recipient_name.get(),
-            email_address=self.recipient_email.get(),
-            phone_number=self.recipient_phone.get(),
-            address_is_commercial=bool(self.address_is_commercial.get()),
-            reference=self.reference.get(),
-            shipment_weight=int(self.weight.get()),
-            other_emails_to_notify=[email.get().strip() for email in self.other_emails if email.get().strip()],
+        corrected_address = self.build_address(
+            street_line_one,
+            street_line_two,
+            city,
+            state_code,
+            postal_code,
         )
 
-        return shipment
+        return corrected_address
 
 
-    def input_is_valid(self) -> bool:
-        pass
+    @staticmethod
+    def classification_from_response(response):
+        classification = response.get("classification") or ""
+
+        if classification:
+            if classification == "RESIDENTIAL":
+                address_is_commercial = 0
+            else:
+                address_is_commercial = 1
+        else:
+            address_is_commercial = -1
+
+        return address_is_commercial
 
 
-    def highlight_errors(self) -> None:
-        pass
+    def validate_fedex_address(self, address):
+        response = attempt_address_completion(self.sandbox_token, self.production_token, address, validation_API_config).json()["output"]["resolvedAddresses"][0]
+
+        return response
+
+
+    def request_address_validation(self, street_line_one, street_line_two, city, state_code, postal_code):
+        address_from_entry = self.build_address(
+                street_line_one,
+                street_line_two,
+                city,
+                state_code,
+                postal_code,
+            )
+
+        response = self.validate_fedex_address(address_from_entry)
+
+        return response
+
+
+    @staticmethod
+    def address_is_confirmed(response):
+        if response["customerMessages"]:
+            msg = response["customerMessages"][0]["code"]
+        else:
+            msg = None
+
+        address_type = response["attributes"]["AddressType"]
+        resolved = response["attributes"]["Resolved"]
+        dpv = response["attributes"]["DPV"]
+
+        if address_type == "STANDARDIZED" and resolved == "true" and dpv == "true":
+            confirmed = True
+        elif address_type == "NORMALIZED" and resolved == "false" and dpv == "false" and msg == "STANDARDIZED.ADDRESS.NOTFOUND":
+            confirmed = False
+        else:
+            confirmed = f"unknown case.\nType:{address_type}\nResolved:{resolved}\nDPV:{dpv}\nMessage:{msg}"
+
+        print(f"Address confirmed: {confirmed}")
+        return confirmed
+
+
+    def list_valid_inputs(self, name, email, phone, reference, weight, other_email_1, other_email_2, other_email_3,
+                       street_line_one, street_line_two, city, state_code, postal_code, classification):
+
+        address_check_response = self.request_address_validation(
+                street_line_one,
+                street_line_two,
+                city,
+                state_code,
+                postal_code
+            )
+
+        results = {
+            "recipient_name": self.name_is_valid(name),
+            "recipient_email": self.email_is_valid(email),
+            "recipient_phone": self.phone_is_valid(phone),
+
+            "reference": self.reference_is_valid(reference),
+            "weight": self.weight_is_valid(weight),
+            "other_email_1": self.email_is_valid(other_email_1),
+            "other_email_2": self.email_is_valid(other_email_2),
+            "other_email_3": self.email_is_valid(other_email_3),
+
+            "street_line_one": self.required_text_is_valid(street_line_one),
+            "street_line_two": True,
+            "city": self.required_text_is_valid(city),
+            "state_code": self.state_is_valid(state_code),
+            "postal_code": self.required_text_is_valid(postal_code),
+
+            "address_type": classification in (0, 1),
+            "address_valid": self.address_is_confirmed(address_check_response)
+        }
+
+        return results
+
+
+    def highlight_errors(self, results: dict) -> None:
+        return
 
 
     def attempt_retrieve_rates(self):
-        if self.input_is_valid():
-            shipment = self.build_shipment()
-            pass
+        results = self.list_valid_inputs(
+            self.recipient_name.get().strip(),
+            self.recipient_email.get().strip(),
+            self.recipient_phone.get().strip(),
+            self.reference.get().strip(),
+            self.weight.get().strip(),
+            self.other_emails[0].get().strip(),
+            self.other_emails[1].get().strip(),
+            self.other_emails[2].get().strip(),
+            self.street_line_one.get().strip(),
+            self.street_line_two.get().strip(),
+            self.city.get().strip(),
+            self.state_code.get(),
+            self.postal_code.get().strip(),
+            self.address_is_commercial.get()
+        )
+
+        print(f"Results: {results}")
+        if all(results.values()):
+            self.retrieve_rates()
         else:
-            self.highlight_errors()
+            self.highlight_errors(results)
 
 
     def retrieve_rates(self):
+        return
         shipment_data = build_shipment_data(example_input)
         available_rates = populate_rates_options(self.sandbox_token, self.production_token, shipment_data, rates_API_config)
 
@@ -509,3 +694,10 @@ class GUI:
 
     def run(self):
         self.root.mainloop()
+
+
+    def run_load_shipment_test_cases(self):
+        for num in test_requests:
+            print(f"testing {num}:")
+            self.load_shipment_details(test_case=num)
+            self.attempt_retrieve_rates()

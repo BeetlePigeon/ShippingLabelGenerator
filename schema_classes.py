@@ -39,7 +39,7 @@ class Address(BaseModel):
     city: str
     state_code: str
     postal_code: str
-    country_code: str
+    country_code: str = "US"
 
 
 class InputData(BaseModel):
@@ -48,7 +48,7 @@ class InputData(BaseModel):
     city: str
     state_code: str
     postal_code: str
-    country_code: str
+    country_code: str = "US"
     name: str
     email_address: str
     phone_number: str

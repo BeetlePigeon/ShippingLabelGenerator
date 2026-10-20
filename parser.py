@@ -101,45 +101,43 @@ class Parser:
 
     def parse_address(self, data):
         raw_address = data["address"]
-        if not raw_address:
-            return None
-        else:
-            address_parts = usaddress.tag(raw_address, tag_mapping={
-                'Recipient': 'recipient',
-                'AddressNumber': 'address1',
-                'AddressNumberPrefix': 'address1',
-                'AddressNumberSuffix': 'address1',
-                'StreetName': 'address1',
-                'StreetNamePreDirectional': 'address1',
-                'StreetNamePreModifier': 'address1',
-                'StreetNamePreType': 'address1',
-                'StreetNamePostDirectional': 'address1',
-                'StreetNamePostModifier': 'address1',
-                'StreetNamePostType': 'address1',
-                'CornerOf': 'address1',
-                'IntersectionSeparator': 'address1',
-                'LandmarkName': 'address1',
-                'USPSBoxGroupID': 'address1',
-                'USPSBoxGroupType': 'address1',
-                'USPSBoxID': 'address1',
-                'USPSBoxType': 'address1',
-                'BuildingName': 'address2',
-                'OccupancyType': 'address2',
-                'OccupancyIdentifier': 'address2',
-                'SubaddressIdentifier': 'address2',
-                'SubaddressType': 'address2',
-                'PlaceName': 'city',
-                'StateName': 'state',
-                'ZipCode': 'zip_code',
-            })
 
-            address = {
-                "street_line_one": address_parts[0].get('address1') or "",
-                "street_line_two": address_parts[0].get('address2') or "",
-                "city": address_parts[0].get('city') or "",
-                "state_code": address_parts[0].get('state') or "",
-                "postal_code": address_parts[0].get('zip_code') or "",
-                "country_code": "US"
-            }
+        address_parts = usaddress.tag(raw_address, tag_mapping={
+            'Recipient': 'recipient',
+            'AddressNumber': 'address1',
+            'AddressNumberPrefix': 'address1',
+            'AddressNumberSuffix': 'address1',
+            'StreetName': 'address1',
+            'StreetNamePreDirectional': 'address1',
+            'StreetNamePreModifier': 'address1',
+            'StreetNamePreType': 'address1',
+            'StreetNamePostDirectional': 'address1',
+            'StreetNamePostModifier': 'address1',
+            'StreetNamePostType': 'address1',
+            'CornerOf': 'address1',
+            'IntersectionSeparator': 'address1',
+            'LandmarkName': 'address1',
+            'USPSBoxGroupID': 'address1',
+            'USPSBoxGroupType': 'address1',
+            'USPSBoxID': 'address1',
+            'USPSBoxType': 'address1',
+            'BuildingName': 'address2',
+            'OccupancyType': 'address2',
+            'OccupancyIdentifier': 'address2',
+            'SubaddressIdentifier': 'address2',
+            'SubaddressType': 'address2',
+            'PlaceName': 'city',
+            'StateName': 'state',
+            'ZipCode': 'zip_code',
+        })
 
-            return Address(**address)
+        address = {
+            "street_line_one": address_parts[0].get('address1') or "",
+            "street_line_two": address_parts[0].get('address2') or "",
+            "city": address_parts[0].get('city') or "",
+            "state_code": address_parts[0].get('state') or "",
+            "postal_code": address_parts[0].get('zip_code') or "",
+            "country_code": "US"
+        }
+
+        return Address(**address)
