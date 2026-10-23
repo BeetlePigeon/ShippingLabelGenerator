@@ -10,7 +10,7 @@ from tables import state_codes
 class GUI:
     def __init__(self):
 
-        self.processor = Processor(self)
+        self.processor = Processor()
 
         self.root = tkinter.Tk()
         self.root.title("FedEx Shipping Label Generator")
@@ -350,17 +350,40 @@ class GUI:
         self.other_emails[2].set(self.processor.preshipment_details["other_email_3"])
 
 
-    def attempt_retrieve_rates(self):
-        self.processor.load_preshipment_details_from_gui()
+    def sync_preshipment_details_from_gui(self):
+        details = {
+            "recipient_name": self.recipient_name.get().strip(),
+            "recipient_email": self.recipient_email.get().strip(),
+            "recipient_phone": self.recipient_phone.get().strip(),
+
+            "street_line_one": self.street_line_one.get().strip(),
+            "street_line_two": self.street_line_two.get().strip(),
+            "city": self.city.get().strip(),
+            "state_code": self.state_code.get(),
+            "postal_code": self.postal_code.get().strip(),
+            "address_is_commercial": self.address_is_commercial.get(),
+
+            "reference": self.reference.get().strip(),
+            "weight": self.weight.get().strip(),
+            "other_email_1": self.other_emails[0].get().strip(),
+            "other_email_2": self.other_emails[1].get().strip(),
+            "other_email_3": self.other_emails[2].get().strip(),
+        }
+
+        self.processor.preshipment_details.update(details)
         self.update_preshipment_sections()
+
+
+    def attempt_retrieve_rates(self):
+        self.sync_preshipment_details_from_gui()
 
         results = self.processor.is_preshipment_valid()
 
         if all(results.values()):
             rates = self.processor.retrieve_rates()
-            self.display_rates(rates)
-            self.lock_preshipment_widgets()
-            self.switch_to_create_label_buttons()
+#            self.display_rates(rates)
+#            self.lock_preshipment_widgets()
+#            self.switch_to_create_label_buttons()
         else:
             self.highlight_errors(results)
 

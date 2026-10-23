@@ -1,22 +1,3 @@
-def build_shipment(self):
-    shipment = InputData(
-        street_line_one=self.street_line_one.get(),
-        street_line_two=self.street_line_two.get(),
-        city=self.city.get(),
-        state_code=self.state_code.get(),
-        postal_code=self.postal_code.get(),
-        name=self.recipient_name.get(),
-        email_address=self.recipient_email.get(),
-        phone_number=self.recipient_phone.get(),
-        address_is_commercial=bool(self.address_is_commercial.get()),
-        reference=self.reference.get(),
-        shipment_weight=float(self.weight.get()),
-        other_emails_to_notify=[email.get().strip() for email in self.other_emails if email.get().strip()],
-    )
-
-    return shipment
-
-
 def retrieve_rates(self):
     return
     shipment_data = build_shipment_data(example_input)
@@ -76,7 +57,45 @@ def update_rate_selection(self):
             row_frame.config(relief="flat")
 
 
-def create_final_shipment(self, pre_shipment_data, available_rates):
+def finalize_shipment_and_save_label(self, pre_shipment_data, available_rates):
     final_shipment_data = select_from_rates_options(pre_shipment_data, available_rates, rates_API_config, ship_API_config)
     label = create_label(self.sandbox_token, self.production_token, final_shipment_data, ship_API_config)
     save_label(label, final_shipment_data.recipient.full_name)
+
+
+
+
+def select_from_rates_options(shipment, available_rates, rates_environment, ship_environment):
+    if rates_environment == APIEnvironment.SANDBOX or ship_environment == APIEnvironment.SANDBOX:
+        shipment.selected_service_type = shipment.default_service_type
+    else:
+        shipment.selected_service_type = shipment.default_service_type
+    return shipment
+
+
+def save_label(response_data, label_recipient_name):
+    tracking_number = response_data["output"]["transactionShipments"][0]["masterTrackingNumber"]
+    encoded_label = response_data["output"]["transactionShipments"][0]["pieceResponses"][0]["packageDocuments"][0][
+        "encodedLabel"]
+    label_bytes = base64.b64decode(encoded_label)
+    output_directory = Path(__file__).parent / "output_labels"
+    output_directory.mkdir(exist_ok=True)
+    label_path = output_directory / f"{label_recipient_name}_{tracking_number}.pdf"
+    label_path.write_bytes(label_bytes)
+
+
+example_input = InputData(
+    street_line_one="308 Negra Arroyo Lane",
+    street_line_two="Apt 737",
+    city="Albuquerque",
+    state_code="NM",
+    postal_code="87104",
+    country_code="US",
+    name="Walter White",
+    email_address="alborz796@gmail.com",
+    phone_number="505-503-4455",
+    address_is_commercial=False,
+    reference="REFNUM",
+    shipment_weight=10,
+    other_emails_to_notify=["alborzzzz@yahoo.com"]
+)

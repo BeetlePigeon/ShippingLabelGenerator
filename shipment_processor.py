@@ -3,20 +3,37 @@ import re
 from scraper import Scraper
 from parser import Parser
 from tables import state_codes
-from private import sandbox_api_key, sandbox_secret_key, production_api_key, production_secret_key
-from api_settings import APIEnvironment, validation_API_config
-from api_requests import get_access_token, attempt_address_completion
-from schema_classes import Address
+from api_settings import APIEnvironment, rates_API_config, validation_API_config
+from api_requests import request_access_token, request_address_completion, request_rates_options
+from schema_classes import Address, Shipment
+from private import (
+    sandbox_api_key,
+    sandbox_secret_key,
+    production_api_key,
+    production_secret_key,
+    company_name,
+    charge_code,
+    shipper_account_number,
+    shipper_street_line_one,
+    shipper_street_line_two,
+    shipper_city,
+    shipper_state_code,
+    shipper_postal_code,
+    shipper_country_code,
+    shipper_address_is_commercial,
+    shipper_name,
+    shipper_email_address,
+    shipper_phone_number,
+)
 
 
 class Processor:
-    def __init__(self, gui):
-        self.gui = gui
-        self.sandbox_token = get_access_token(sandbox_api_key, sandbox_secret_key, APIEnvironment.SANDBOX)
-        self.production_token = get_access_token(production_api_key, production_secret_key, APIEnvironment.PRODUCTION)
+    def __init__(self):
+        self.sandbox_token = request_access_token(sandbox_api_key, sandbox_secret_key, APIEnvironment.SANDBOX)
+        self.production_token = request_access_token(production_api_key, production_secret_key, APIEnvironment.PRODUCTION)
 
         self.scraper = Scraper()
-        self.parser = Parser(self)
+        self.parser = Parser()
 
         self.preshipment_details = {
             "recipient_name": "",
@@ -108,25 +125,6 @@ class Processor:
         return True
 
 
-    def load_preshipment_details_from_gui(self):
-        self.preshipment_details["recipient_name"] = self.gui.recipient_name.get().strip()
-        self.preshipment_details["recipient_email"] = self.gui.recipient_email.get().strip()
-        self.preshipment_details["recipient_phone"] = self.gui.recipient_phone.get().strip()
-
-        self.preshipment_details["street_line_one"] = self.gui.street_line_one.get().strip()
-        self.preshipment_details["street_line_two"] = self.gui.street_line_two.get().strip()
-        self.preshipment_details["city"] = self.gui.city.get().strip()
-        self.preshipment_details["state_code"] = self.gui.state_code.get()
-        self.preshipment_details["postal_code"] = self.gui.postal_code.get().strip()
-        self.preshipment_details["address_is_commercial"] = self.gui.address_is_commercial.get()
-
-        self.preshipment_details["reference"] = self.gui.reference.get().strip()
-        self.preshipment_details["weight"] = self.gui.weight.get().strip()
-        self.preshipment_details["other_email_1"] = self.gui.other_emails[0].get().strip()
-        self.preshipment_details["other_email_2"] = self.gui.other_emails[1].get().strip()
-        self.preshipment_details["other_email_3"] = self.gui.other_emails[2].get().strip()
-
-
     def is_preshipment_valid(self):
         address_check_response = self.request_address_validation(
                 self.preshipment_details["street_line_one"],
@@ -159,8 +157,56 @@ class Processor:
         return results
 
 
+    def build_preshipment_data(self):
+        shipper_address = Address(
+            street_line_one=shipper_street_line_one,
+            street_line_two=shipper_street_line_two,
+            city=shipper_city,
+            state_code=shipper_state_code,
+            postal_code=shipper_postal_code,
+            country_code=shipper_country_code,
+        )
+
+        recipient_address = Address(
+            street_line_one=self.preshipment_details["street_line_one"],
+            street_line_two=self.preshipment_details["street_line_two"],
+            city=self.preshipment_details["city"],
+            state_code=self.preshipment_details["state_code"],
+            postal_code=self.preshipment_details["postal_code"],
+            country_code="US",
+        )
+
+        return Shipment(
+            company_name=company_name,
+            charge_code=charge_code,
+            account_number=shipper_account_number,
+
+            shipper_address=shipper_address,
+            shipper_name=shipper_name,
+            shipper_email_address=shipper_email_address,
+            shipper_phone_number=shipper_phone_number,
+            shipper_address_is_commercial=shipper_address_is_commercial,
+
+            recipient_address=recipient_address,
+            recipient_name=self.preshipment_details["recipient_name"],
+            recipient_email_address=self.preshipment_details["recipient_email"],
+            recipient_phone_number=self.preshipment_details["recipient_phone"],
+            recipient_address_is_commercial=bool(self.preshipment_details["address_is_commercial"]),
+
+            reference=self.preshipment_details["reference"],
+            weight=self.preshipment_details["weight"],
+            other_email_1=self.preshipment_details["other_email_1"],
+            other_email_2=self.preshipment_details["other_email_2"],
+            other_email_3=self.preshipment_details["other_email_3"],
+
+            selected_service_type=None,
+        )
+
+
     def retrieve_rates(self):
-        pass
+        preshipment_data = self.build_preshipment_data()
+        rates = request_rates_options(self.sandbox_token, self.production_token, preshipment_data, rates_API_config)
+        return rates
 
 
     def request_address_validation(self, street_line_one, street_line_two, city, state_code, postal_code):
@@ -210,8 +256,10 @@ class Processor:
         if classification:
             if classification == "RESIDENTIAL":
                 address_is_commercial = 0
-            else:
+            elif classification == "BUSINESS":
                 address_is_commercial = 1
+            else:
+                address_is_commercial = -1
         else:
             address_is_commercial = -1
 
@@ -230,7 +278,7 @@ class Processor:
 
 
     def validate_fedex_address(self, address):
-        response = attempt_address_completion(self.sandbox_token, self.production_token, address, validation_API_config).json()["output"]["resolvedAddresses"][0]
+        response = request_address_completion(self.sandbox_token, self.production_token, address, validation_API_config).json()["output"]["resolvedAddresses"][0]
 
         return response
 
@@ -247,14 +295,12 @@ class Processor:
         dpv = response["attributes"]["DPV"]
 
         if address_type == "STANDARDIZED" and resolved == "true" and dpv == "true":
-            confirmed = True
+            return True
         elif address_type == "NORMALIZED" and resolved == "false" and dpv == "false" and msg == "STANDARDIZED.ADDRESS.NOTFOUND":
-            confirmed = False
+            return False
         else:
-            confirmed = f"unknown case.\nType:{address_type}\nResolved:{resolved}\nDPV:{dpv}\nMessage:{msg}"
-
-        print(f"Address confirmed: {confirmed}")
-        return confirmed
+            print(f"unknown case.\nType:{address_type}\nResolved:{resolved}\nDPV:{dpv}\nMessage:{msg}")
+            return None
 
 
     @staticmethod

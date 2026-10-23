@@ -5,8 +5,8 @@ import re
 
 
 class Parser:
-    def __init__(self, gui):
-        self.gui = gui
+    def __init__(self):
+        pass
 
 
     @staticmethod
