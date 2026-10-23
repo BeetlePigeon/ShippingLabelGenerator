@@ -1,31 +1,19 @@
 import tkinter
-import re
 from tkinter import ttk
-from scraper import Scraper
-from parser import Parser
-from tables import state_codes
-from private import sandbox_api_key, sandbox_secret_key, production_api_key, production_secret_key, rp_url_prefix
-from api_settings import APIEnvironment, rates_API_config, ship_API_config, validation_API_config
-from api_requests import get_access_token, build_shipment_data, attempt_address_completion, populate_rates_options, select_from_rates_options, create_label, save_label
-from schema_classes import InputData, Address
-from input import example_input
+from shipment_processor import Processor
+from private import rp_url_prefix
 from PIL import Image, ImageTk
 from pathlib import Path
-from sample_inputs import test_requests
-import json
+from tables import state_codes
 
 
 class GUI:
     def __init__(self):
-        self.sandbox_token = get_access_token(sandbox_api_key, sandbox_secret_key, APIEnvironment.SANDBOX)
-        self.production_token = get_access_token(production_api_key, production_secret_key, APIEnvironment.PRODUCTION)
 
-        self.scraper = Scraper()
-        self.parser = Parser(self)
+        self.processor = Processor(self)
 
         self.root = tkinter.Tk()
         self.root.title("FedEx Shipping Label Generator")
-
 
         assets_dir = Path(__file__).parent
 
@@ -77,10 +65,10 @@ class GUI:
         self.rp_paste_button = ttk.Button(rp_controls_frame, text="⧉", width=2, style="Icon.TButton", command=self.handle_rp_paste)
         self.rp_paste_button.pack(side="left", padx=(3, 10))
 
-        self.load_shipment_details_button = ttk.Button(rp_controls_frame, text="Lookup", style="Primary.TButton", command=self.load_shipment_details)
-        self.load_shipment_details_button.pack(side="left")
+        self.lookup_button = ttk.Button(rp_controls_frame, text="Lookup", style="Primary.TButton", command=self.lookup_and_display_preshipment_details)
+        self.lookup_button.pack(side="left")
 
-        self.rp_number_entry.bind("<Return>", lambda event: self.load_shipment_details_button.invoke())
+        self.rp_number_entry.bind("<Return>", lambda event: self.lookup_button.invoke())
 
         self.rp_error_label = ttk.Label(self.rp_outer_frame, text="", style="Error.TLabel")
         self.rp_error_label.grid(row=1, column=0, pady=(5, 0))
@@ -89,6 +77,26 @@ class GUI:
         self.results_frame.grid(row=2, column=0, sticky="nsew")
         self.results_frame.columnconfigure(0, weight=1, uniform="form")
         self.results_frame.columnconfigure(1, weight=1, uniform="form")
+
+        self.recipient_name = tkinter.StringVar(value=self.processor.preshipment_details["recipient_name"])
+        self.recipient_email = tkinter.StringVar(value=self.processor.preshipment_details["recipient_email"])
+        self.recipient_phone = tkinter.StringVar(value=self.processor.preshipment_details["recipient_phone"])
+
+        self.street_line_one = tkinter.StringVar(value=self.processor.preshipment_details["street_line_one"])
+        self.street_line_two = tkinter.StringVar(value=self.processor.preshipment_details["street_line_two"])
+        self.city = tkinter.StringVar(value=self.processor.preshipment_details["city"])
+        self.state_code = tkinter.StringVar(value=self.processor.preshipment_details["state_code"])
+        self.postal_code = tkinter.StringVar(value=self.processor.preshipment_details["postal_code"])
+        self.address_is_commercial = tkinter.IntVar(value=self.processor.preshipment_details["address_is_commercial"])
+
+        self.reference = tkinter.StringVar(value=self.processor.preshipment_details["reference"])
+        self.weight = tkinter.StringVar(value=self.processor.preshipment_details["weight"])
+        self.other_emails = [
+        tkinter.StringVar(value=self.processor.preshipment_details["other_email_1"]),
+        tkinter.StringVar(value=self.processor.preshipment_details["other_email_2"]),
+        tkinter.StringVar(value=self.processor.preshipment_details["other_email_3"]),
+            ]
+
         self.create_preshipment_sections()
 
         action_frame = ttk.Frame(self.main_frame)
@@ -97,7 +105,7 @@ class GUI:
         self.retrieve_rates_button = ttk.Button(action_frame, text="Retrieve Rates", style="Primary.TButton", command=self.attempt_retrieve_rates)
         self.retrieve_rates_button.pack(side="left", padx=7)
 
-        self.clear_shipment_details_button = ttk.Button(action_frame, text="Clear All", command=self.clear_preshipment_sections)
+        self.clear_shipment_details_button = ttk.Button(action_frame, text="Clear All", command=self.clear_preshipment_widgets)
         self.clear_shipment_details_button.pack(side="left", padx=7)
 
 
@@ -177,10 +185,6 @@ class GUI:
         self.recipient_header = tkinter.Label(recipient_frame, text="Recipient", anchor="w", padx=12, pady=2, bg=self.colors["muted"], fg=self.colors["ink"], font=("Segoe UI", 12, "bold"))
         self.recipient_header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 12))
 
-        self.recipient_name = tkinter.StringVar(value="")
-        self.recipient_email = tkinter.StringVar(value="")
-        self.recipient_phone = tkinter.StringVar(value="")
-
         self.create_field_label(recipient_frame, "Name", 1, required=True)
         ttk.Entry(recipient_frame, textvariable=self.recipient_name, width=36).grid(row=1, column=1, sticky="ew", padx=5, pady=3)
 
@@ -197,10 +201,6 @@ class GUI:
 
         self.other_header = tkinter.Label(other_frame, text="Other", anchor="w", padx=12, pady=2, bg=self.colors["muted"], fg=self.colors["ink"], font=("Segoe UI", 12, "bold"))
         self.other_header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 12))
-
-        self.reference = tkinter.StringVar(value="")
-        self.weight = tkinter.StringVar(value="")
-        self.other_emails = [tkinter.StringVar(value=""), tkinter.StringVar(value=""), tkinter.StringVar(value="")]
 
         fields = [
             ("Reference #", self.reference),
@@ -224,13 +224,6 @@ class GUI:
 
         self.address_header = tkinter.Label(address_frame, text="Address", anchor="w", padx=12, pady=2, bg=self.colors["muted"], fg=self.colors["ink"], font=("Segoe UI", 12, "bold"))
         self.address_header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 12))
-
-        self.street_line_one = tkinter.StringVar(value="")
-        self.street_line_two = tkinter.StringVar(value="")
-        self.city = tkinter.StringVar(value="")
-        self.state_code = tkinter.StringVar(value="")
-        self.postal_code = tkinter.StringVar(value="")
-        self.address_is_commercial = tkinter.IntVar(value=-1)
 
         self.create_field_label(address_frame, "Street line 1", row=1, required=True, pady=4)
         ttk.Entry(address_frame, textvariable=self.street_line_one, width=36).grid(row=1, column=1, sticky="ew", padx=5, pady=4)
@@ -320,384 +313,61 @@ class GUI:
             return "break"
 
 
-    def clear_preshipment_sections(self):
-        self.recipient_name.set("")
-        self.recipient_email.set("")
-        self.recipient_phone.set("")
-
-        self.street_line_one.set("")
-        self.street_line_two.set("")
-        self.city.set("")
-        self.state_code.set("")
-        self.postal_code.set("")
-        self.address_is_commercial.set(-1)
-
-        self.reference.set("")
-        self.weight.set("")
-
-        for i in range(3):
-            self.other_emails[i].set("")
+    def clear_preshipment_widgets(self):
+        self.processor.clear_preshipment_details()
+        self.update_preshipment_sections()
 
 
-    def load_shipment_details(self, test_case=None):
-        if test_case:
-            request_number = test_case
+    def lookup_and_display_preshipment_details(self):
+        self.clear_preshipment_widgets()
+
+        request_number = self.rp_number_entry.get().strip()
+        lookup_success = self.processor.load_preshipment_details_from_scraper(request_number)
+
+        if lookup_success:
+            self.rp_error_label.config(text="")
+            self.update_preshipment_sections()
         else:
-            request_number = self.rp_number_entry.get().strip()
-            if request_number == "123123":
-                self.run_load_shipment_test_cases()
-                return
-
-        url = f"https://requestportal.americansystems.com/Request/Request?id={request_number}"
-
-        if not self.scraper.request_number_is_feasible(request_number):
             self.rp_error_label.config(text="Invalid RequestPortal number.")
-            return
-
-        if not self.scraper.session_is_authenticated(url):
-            self.scraper.authenticate_session(url)
-
-        if not self.scraper.request_is_valid(url):
-            self.rp_error_label.config(text="Invalid RequestPortal number.")
-            return
-
-        rp_dict = self.scraper.scrape_request(url).model_dump()
-
-        self.clear_preshipment_sections()
-
-        name, email = self.parser.parse_names(rp_dict)
-        phone = self.parser.parse_contact_numbers(rp_dict)
-
-        raw_address = self.parser.parse_address(rp_dict)
-        address_check_response = self.request_address_validation(
-            raw_address.street_line_one,
-            raw_address.street_line_two,
-            raw_address.city,
-            raw_address.state_code,
-            raw_address.postal_code
-        )
-
-        normalized_address = self.address_from_response(address_check_response)
-        address_classification = self.classification_from_response(address_check_response)
-
-        reference = "PLACEHOLDER"
-        weight = 6.9
-        other_emails = self.parser.parse_others_to_notify(rp_dict)
-
-        self.recipient_name.set(name)
-        self.recipient_email.set(email)
-        self.recipient_phone.set(phone)
-
-        self.street_line_one.set(normalized_address.street_line_one)
-        self.street_line_two.set(normalized_address.street_line_two)
-        self.city.set(normalized_address.city)
-        self.state_code.set(normalized_address.state_code)
-        self.postal_code.set(normalized_address.postal_code)
-        self.address_is_commercial.set(address_classification)
-
-        self.reference.set(reference)
-        self.weight.set(str(weight))
-
-        for i in range(min(len(other_emails), 3)):
-            self.other_emails[i].set(other_emails[i])
 
 
-    @staticmethod
-    def pretty_print(response):
-        pretty_json = json.dumps(response, indent=4)
-        print(pretty_json)
+    def update_preshipment_sections(self):
+        self.recipient_name.set(self.processor.preshipment_details["recipient_name"])
+        self.recipient_email.set(self.processor.preshipment_details["recipient_email"])
+        self.recipient_phone.set(self.processor.preshipment_details["recipient_phone"])
+
+        self.street_line_one.set(self.processor.preshipment_details["street_line_one"])
+        self.street_line_two.set(self.processor.preshipment_details["street_line_two"])
+        self.city.set(self.processor.preshipment_details["city"])
+        self.state_code.set(self.processor.preshipment_details["state_code"])
+        self.postal_code.set(self.processor.preshipment_details["postal_code"])
+        self.address_is_commercial.set(self.processor.preshipment_details["address_is_commercial"])
+
+        self.reference.set(self.processor.preshipment_details["reference"])
+        self.weight.set(self.processor.preshipment_details["weight"])
+        self.other_emails[0].set(self.processor.preshipment_details["other_email_1"])
+        self.other_emails[1].set(self.processor.preshipment_details["other_email_2"])
+        self.other_emails[2].set(self.processor.preshipment_details["other_email_3"])
 
 
-    @staticmethod
-    def required_text_is_valid(text: str) -> bool:
-        return bool(text)
+    def attempt_retrieve_rates(self):
+        self.processor.load_preshipment_details_from_gui()
+        self.update_preshipment_sections()
 
+        results = self.processor.is_preshipment_valid()
 
-    @staticmethod
-    def name_is_valid(text: str) -> bool:
-        return bool(text)
-
-
-    @staticmethod
-    def email_is_valid(text: str) -> bool:
-        email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-        if not text or re.fullmatch(email_regex, text):
-            return True
-        return False
-
-
-    @staticmethod
-    def phone_is_valid(text: str) -> bool:
-        cleaned = re.sub(r'\D', '', text)
-        return not text or len(cleaned) == 10 or (len(cleaned) == 11 and cleaned.startswith("1"))
-
-
-    @staticmethod
-    def reference_is_valid(text: str) -> bool:
-        return not text or len(text) <= 24
-
-
-    @staticmethod
-    def weight_is_valid(weight: str) -> bool:
-        return (not weight or
-                any(char.isdigit() for char in weight)
-                and 0 < float(weight) <= 20
-        )
-
-
-    @staticmethod
-    def state_is_valid(selection) -> bool:
-        return selection in state_codes
-
-
-    @staticmethod
-    def build_address(street_line_one, street_line_two, city, state_code, postal_code):
-        return Address(
-            street_line_one=street_line_one or "",
-            street_line_two=street_line_two or "",
-            city=city or "",
-            state_code=state_code or "",
-            postal_code=postal_code or "",
-        )
-
-
-    def build_shipment(self):
-        shipment = InputData(
-            street_line_one=self.street_line_one.get(),
-            street_line_two=self.street_line_two.get(),
-            city=self.city.get(),
-            state_code=self.state_code.get(),
-            postal_code=self.postal_code.get(),
-            name=self.recipient_name.get(),
-            email_address=self.recipient_email.get(),
-            phone_number=self.recipient_phone.get(),
-            address_is_commercial=bool(self.address_is_commercial.get()),
-            reference=self.reference.get(),
-            shipment_weight=float(self.weight.get()),
-            other_emails_to_notify=[email.get().strip() for email in self.other_emails if email.get().strip()],
-        )
-
-        return shipment
-
-
-    def address_from_response(self, response):
-        street_lines = response.get("streetLinesToken")
-        if street_lines:
-            street_line_one = street_lines[0]
-            if len(street_lines) == 1:
-                street_line_two = ""
-            else:
-                street_line_two = street_lines[1]
+        if all(results.values()):
+            rates = self.processor.retrieve_rates()
+            self.display_rates(rates)
+            self.lock_preshipment_widgets()
+            self.switch_to_create_label_buttons()
         else:
-            street_line_one, street_line_two = "", ""
-
-        city = response.get("city")
-        state_code = response.get("stateOrProvinceCode")
-        postal_code = response.get("postalCode")
-
-        corrected_address = self.build_address(
-            street_line_one,
-            street_line_two,
-            city,
-            state_code,
-            postal_code,
-        )
-
-        return corrected_address
-
-
-    @staticmethod
-    def classification_from_response(response):
-        classification = response.get("classification") or ""
-
-        if classification:
-            if classification == "RESIDENTIAL":
-                address_is_commercial = 0
-            else:
-                address_is_commercial = 1
-        else:
-            address_is_commercial = -1
-
-        return address_is_commercial
-
-
-    def validate_fedex_address(self, address):
-        response = attempt_address_completion(self.sandbox_token, self.production_token, address, validation_API_config).json()["output"]["resolvedAddresses"][0]
-
-        return response
-
-
-    def request_address_validation(self, street_line_one, street_line_two, city, state_code, postal_code):
-        address_from_entry = self.build_address(
-                street_line_one,
-                street_line_two,
-                city,
-                state_code,
-                postal_code,
-            )
-
-        response = self.validate_fedex_address(address_from_entry)
-
-        return response
-
-
-    @staticmethod
-    def address_is_confirmed(response):
-        if response["customerMessages"]:
-            msg = response["customerMessages"][0]["code"]
-        else:
-            msg = None
-
-        address_type = response["attributes"]["AddressType"]
-        resolved = response["attributes"]["Resolved"]
-        dpv = response["attributes"]["DPV"]
-
-        if address_type == "STANDARDIZED" and resolved == "true" and dpv == "true":
-            confirmed = True
-        elif address_type == "NORMALIZED" and resolved == "false" and dpv == "false" and msg == "STANDARDIZED.ADDRESS.NOTFOUND":
-            confirmed = False
-        else:
-            confirmed = f"unknown case.\nType:{address_type}\nResolved:{resolved}\nDPV:{dpv}\nMessage:{msg}"
-
-        print(f"Address confirmed: {confirmed}")
-        return confirmed
-
-
-    def list_valid_inputs(self, name, email, phone, reference, weight, other_email_1, other_email_2, other_email_3,
-                       street_line_one, street_line_two, city, state_code, postal_code, classification):
-
-        address_check_response = self.request_address_validation(
-                street_line_one,
-                street_line_two,
-                city,
-                state_code,
-                postal_code
-            )
-
-        results = {
-            "recipient_name": self.name_is_valid(name),
-            "recipient_email": self.email_is_valid(email),
-            "recipient_phone": self.phone_is_valid(phone),
-
-            "reference": self.reference_is_valid(reference),
-            "weight": self.weight_is_valid(weight),
-            "other_email_1": self.email_is_valid(other_email_1),
-            "other_email_2": self.email_is_valid(other_email_2),
-            "other_email_3": self.email_is_valid(other_email_3),
-
-            "street_line_one": self.required_text_is_valid(street_line_one),
-            "street_line_two": True,
-            "city": self.required_text_is_valid(city),
-            "state_code": self.state_is_valid(state_code),
-            "postal_code": self.required_text_is_valid(postal_code),
-
-            "address_type": classification in (0, 1),
-            "address_valid": self.address_is_confirmed(address_check_response)
-        }
-
-        return results
+            self.highlight_errors(results)
 
 
     def highlight_errors(self, results: dict) -> None:
         return
 
 
-    def attempt_retrieve_rates(self):
-        results = self.list_valid_inputs(
-            self.recipient_name.get().strip(),
-            self.recipient_email.get().strip(),
-            self.recipient_phone.get().strip(),
-            self.reference.get().strip(),
-            self.weight.get().strip(),
-            self.other_emails[0].get().strip(),
-            self.other_emails[1].get().strip(),
-            self.other_emails[2].get().strip(),
-            self.street_line_one.get().strip(),
-            self.street_line_two.get().strip(),
-            self.city.get().strip(),
-            self.state_code.get(),
-            self.postal_code.get().strip(),
-            self.address_is_commercial.get()
-        )
-
-        print(f"Results: {results}")
-        if all(results.values()):
-            self.retrieve_rates()
-        else:
-            self.highlight_errors(results)
-
-
-    def retrieve_rates(self):
-        return
-        shipment_data = build_shipment_data(example_input)
-        available_rates = populate_rates_options(self.sandbox_token, self.production_token, shipment_data, rates_API_config)
-
-        cheapest_index = min(range(len(available_rates.options)), key=lambda index: available_rates.options[index].estimated_delivery_cost)
-
-        self.selected_rate_index = tkinter.IntVar(value=cheapest_index)
-        self.rate_row_frames = []
-
-        SERVICE_WIDTH, DELIVERY_WIDTH, COST_WIDTH = 25, 25, 15
-
-        header_frame = ttk.Frame(self.results_frame)
-        header_frame.grid(row=0, column=0, sticky="ew")
-
-        ttk.Label(header_frame, text="", width=3).grid(row=0, column=0, padx=5)
-        ttk.Label(header_frame, text="Service", width=SERVICE_WIDTH).grid(row=0, column=1, padx=5, pady=2)
-        ttk.Label(header_frame, text="Est. Delivery", width=DELIVERY_WIDTH).grid(row=0, column=2, padx=5, pady=2)
-        ttk.Label(header_frame, text="Estimated Cost", width=COST_WIDTH).grid(row=0, column=3, padx=5, pady=2)
-
-        for index, rate in enumerate(available_rates.options):
-            row_frame = tkinter.Frame(self.results_frame, borderwidth=1, relief="flat")
-            row_frame.grid(row=index+1, column=0, padx=2, pady=1, sticky="ew")
-
-            self.rate_row_frames.append(row_frame)
-
-            radio_button = ttk.Radiobutton(row_frame, variable=self.selected_rate_index, value=index, command=self.update_rate_selection)
-            radio_button.grid(row=0, column=0, padx=5, pady=4)
-
-            service_label = ttk.Label(row_frame, text=rate.service_type, width=SERVICE_WIDTH)
-            service_label.grid(row=0, column=1, padx=5, pady=4, sticky="w")
-
-            delivery_label = ttk.Label(row_frame, text=rate.estimated_delivery_time, width=DELIVERY_WIDTH)
-            delivery_label.grid(row=0, column=2, padx=5, pady=4, sticky="w")
-
-            cost_label = ttk.Label(row_frame, text=f"${rate.estimated_delivery_cost:.2f}", width=COST_WIDTH)
-            cost_label.grid(row=0, column=3, padx=5, pady=4, sticky="w")
-
-            for widget in (row_frame, service_label, delivery_label, cost_label):
-                widget.bind("<Button-1>", lambda event, i=index: self.select_rate(i))
-
-        self.update_rate_selection()
-
-
-    def select_rate(self, index):
-        self.selected_rate_index.set(index)
-        self.update_rate_selection()
-
-
-    def update_rate_selection(self):
-        selected_index = self.selected_rate_index.get()
-
-        for index, row_frame in enumerate(self.rate_row_frames):
-            if index == selected_index:
-                row_frame.config(relief="solid")
-            else:
-                row_frame.config(relief="flat")
-
-
-    def create_final_shipment(self, pre_shipment_data, available_rates):
-        final_shipment_data = select_from_rates_options(pre_shipment_data, available_rates, rates_API_config, ship_API_config)
-        label = create_label(self.sandbox_token, self.production_token, final_shipment_data, ship_API_config)
-        save_label(label, final_shipment_data.recipient.full_name)
-
-
     def run(self):
         self.root.mainloop()
-
-
-    def run_load_shipment_test_cases(self):
-        for num in test_requests:
-            print(f"testing {num}:")
-            self.load_shipment_details(test_case=num)
-            self.attempt_retrieve_rates()

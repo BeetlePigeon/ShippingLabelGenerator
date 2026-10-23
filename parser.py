@@ -95,7 +95,14 @@ class Parser:
     @staticmethod
     def parse_others_to_notify(data) -> list[str]:
         parts = re.split("; ", data["others_to_notify"])
-        others_to_notify = [part for part in parts]
+        scraped_others = [part for part in parts]
+        others_to_notify = []
+        for i in range(3):
+            if i < len(scraped_others):
+                others_to_notify.append(scraped_others[i])
+            else:
+                others_to_notify.append("")
+
         return others_to_notify
 
 
