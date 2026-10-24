@@ -163,6 +163,11 @@ class GUI:
 
         style.configure("Card.TRadiobutton", background="white", foreground=c["ink"], font=("Segoe UI", 10))
 
+        style.configure("Compact.TButton", padding=(8, 2), font=("Segoe UI", 9))
+
+        style.configure("CompactPrimary.TButton", background=c["primary"], foreground="white", bordercolor=c["primary"], padding=(8, 2), font=("Segoe UI", 9, "bold"))
+        style.map("CompactPrimary.TButton", background=[("active", c["primary_hover"])], foreground=[("active", "white")])
+
 
     def create_field_label(self, parent, text, row, column=0, required=False, padx=5, pady=3):
         label_frame = ttk.Frame(parent, style="CardInterior.TFrame")
@@ -260,6 +265,28 @@ class GUI:
         zip_validation = (self.root.register(self.validate_zip_entry), "%P")
         ttk.Entry(location_frame, textvariable=self.postal_code, width=10, validate="key", validatecommand=zip_validation).grid(row=3, column=1, sticky="ew", padx=(5, 0), pady=2)
 
+        address_frame.rowconfigure(4, weight=1)
+
+        self.suggest_address_button = ttk.Button(address_frame, text="Suggest Address", style="Compact.TButton", command=self.suggest_address)
+        self.suggest_address_button.grid(row=5, column=0, columnspan=2, sticky="w", padx=5, pady=(0, 4))
+
+        ttk.Label(address_frame, text="Suggested Address", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=6, column=0, columnspan=2, sticky="w", padx=5, pady=(0, 2))
+        self.suggested_address_display = tkinter.StringVar(value="")
+        self.suggested_address_entry = ttk.Entry(address_frame, textvariable=self.suggested_address_display, state="readonly")
+        self.suggested_address_entry.grid(row=7, column=0, columnspan=2, sticky="ew", padx=5, pady=(0, 3))
+
+        choice_frame = ttk.Frame(address_frame, style="CardInterior.TFrame")
+        choice_frame.grid(row=8, column=0, columnspan=2, pady=(0, 2))
+
+        self.use_suggested_button = ttk.Button(choice_frame, text="Use Suggested Address", style="CompactPrimary.TButton", state="disabled", command=self.use_suggested_address)
+        self.use_suggested_button.pack(side="left", padx=(0, 5))
+
+        self.use_entered_button = ttk.Button(choice_frame, text="Use Address As Entered", style="Compact.TButton", state="disabled", command=self.use_address_as_entered)
+        self.use_entered_button.pack(side="left", padx=(5, 0))
+
+        self.suggestion_status = ttk.Label(address_frame, text="", style="Card.TLabel")
+        self.suggestion_status.grid(row=8, column=0, columnspan=2, sticky="w", padx=5, pady=(6, 2))
+
 
     @staticmethod
     def validate_rp_number_entry(text: str) -> bool:
@@ -315,7 +342,7 @@ class GUI:
 
     def clear_preshipment_widgets(self):
         self.processor.clear_preshipment_details()
-        self.update_preshipment_sections()
+        self.sync_preshipment_details_from_processor_to_gui()
 
 
     def lookup_and_display_preshipment_details(self):
@@ -326,12 +353,12 @@ class GUI:
 
         if lookup_success:
             self.rp_error_label.config(text="")
-            self.update_preshipment_sections()
+            self.sync_preshipment_details_from_processor_to_gui()
         else:
             self.rp_error_label.config(text="Invalid RequestPortal number.")
 
 
-    def update_preshipment_sections(self):
+    def sync_preshipment_details_from_processor_to_gui(self):
         self.recipient_name.set(self.processor.preshipment_details["recipient_name"])
         self.recipient_email.set(self.processor.preshipment_details["recipient_email"])
         self.recipient_phone.set(self.processor.preshipment_details["recipient_phone"])
@@ -350,7 +377,7 @@ class GUI:
         self.other_emails[2].set(self.processor.preshipment_details["other_email_3"])
 
 
-    def sync_preshipment_details_from_gui(self):
+    def sync_preshipment_details_from_gui_to_processor(self):
         details = {
             "recipient_name": self.recipient_name.get().strip(),
             "recipient_email": self.recipient_email.get().strip(),
@@ -371,15 +398,16 @@ class GUI:
         }
 
         self.processor.preshipment_details.update(details)
-        self.update_preshipment_sections()
+        self.sync_preshipment_details_from_processor_to_gui()
 
 
     def attempt_retrieve_rates(self):
-        self.sync_preshipment_details_from_gui()
+        self.sync_preshipment_details_from_gui_to_processor()
 
         results = self.processor.is_preshipment_valid()
+        address_checked = results.get("address_valid")
 
-        if all(results.values()):
+        if address_checked and all(results.values()):
             rates = self.processor.retrieve_rates()
 #            self.display_rates(rates)
 #            self.lock_preshipment_widgets()
@@ -390,6 +418,32 @@ class GUI:
 
     def highlight_errors(self, results: dict) -> None:
         return
+
+
+    def update_suggested_address(self, address, is_commercial):
+        self.processor.set_suggested_address(address, is_commercial)
+
+
+    def display_address_suggestion_failure_message(self):
+        raise ValueError("Failed to retrieve address suggestion for the entered details.")
+
+
+    def suggest_address(self):
+        self.sync_preshipment_details_from_gui_to_processor()
+        success, address, is_commercial = self.processor.get_suggested_address()
+        if success:
+            self.update_suggested_address(address, is_commercial)
+        else:
+            self.display_address_suggestion_failure_message()
+
+
+    def use_suggested_address(self):
+        self.processor.suggested_address_to_preshipment_address()
+        self.sync_preshipment_details_from_processor_to_gui()
+
+
+    def use_address_as_entered(self):
+        pass
 
 
     def run(self):

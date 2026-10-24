@@ -29,7 +29,7 @@ def request_access_token(api_key, secret_key, environment):
     return token
 
 
-def request_address_completion(sandbox_auth_token, production_auth_token, address, environment):
+def request_suggested_address(sandbox_auth_token, production_auth_token, address, environment):
     if environment == APIEnvironment.SANDBOX:
         url = "https://apis-sandbox.fedex.com/address/v1/addresses/resolve"
         token = sandbox_auth_token

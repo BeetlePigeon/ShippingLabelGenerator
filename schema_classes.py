@@ -82,7 +82,7 @@ class Shipment(BaseModel):
     recipient_address_is_commercial: bool
 
     reference: str
-    weight: str
+    weight: str = "8"
     other_email_1: str
     other_email_2: str
     other_email_3: str

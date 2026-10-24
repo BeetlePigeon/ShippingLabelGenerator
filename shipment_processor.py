@@ -4,7 +4,7 @@ from scraper import Scraper
 from parser import Parser
 from tables import state_codes
 from api_settings import APIEnvironment, rates_API_config, validation_API_config
-from api_requests import request_access_token, request_address_completion, request_rates_options
+from api_requests import request_access_token, request_suggested_address, request_rates_options
 from schema_classes import Address, Shipment
 from private import (
     sandbox_api_key,
@@ -35,6 +35,10 @@ class Processor:
         self.scraper = Scraper()
         self.parser = Parser()
 
+        self.address_valid = False
+        self.address_changed_since_validated = True
+        self.address_snapshot = None
+
         self.preshipment_details = {
             "recipient_name": "",
             "recipient_email": "",
@@ -50,6 +54,15 @@ class Processor:
             "other_email_1": "",
             "other_email_2": "",
             "other_email_3": "",
+        }
+
+        self.suggested_address = {
+            "street_line_one": "",
+            "street_line_two": "",
+            "city": "",
+            "state_code": "",
+            "postal_code": "",
+            "address_is_commercial": -1,
         }
 
 
@@ -90,16 +103,7 @@ class Processor:
         phone = self.parser.parse_contact_numbers(rp_dict)
 
         raw_address = self.parser.parse_address(rp_dict)
-        address_check_response = self.request_address_validation(
-            raw_address.street_line_one,
-            raw_address.street_line_two,
-            raw_address.city,
-            raw_address.state_code,
-            raw_address.postal_code
-        )
-
-        normalized_address = self.address_from_response(address_check_response)
-        address_classification = self.classification_from_response(address_check_response)
+        address_classification = -1
 
         reference = "no_reference"
         weight = "8"
@@ -109,11 +113,11 @@ class Processor:
         self.preshipment_details["recipient_email"] = recipient_email
         self.preshipment_details["recipient_phone"] = phone
 
-        self.preshipment_details["street_line_one"] = normalized_address.street_line_one
-        self.preshipment_details["street_line_two"] = normalized_address.street_line_two
-        self.preshipment_details["city"] = normalized_address.city
-        self.preshipment_details["state_code"] = normalized_address.state_code
-        self.preshipment_details["postal_code"] = normalized_address.postal_code
+        self.preshipment_details["street_line_one"] = raw_address.street_line_one
+        self.preshipment_details["street_line_two"] = raw_address.street_line_two
+        self.preshipment_details["city"] = raw_address.city
+        self.preshipment_details["state_code"] = raw_address.state_code
+        self.preshipment_details["postal_code"] = raw_address.postal_code
         self.preshipment_details["address_is_commercial"] = address_classification
 
         self.preshipment_details["reference"] = reference
@@ -126,14 +130,6 @@ class Processor:
 
 
     def is_preshipment_valid(self):
-        address_check_response = self.request_address_validation(
-                self.preshipment_details["street_line_one"],
-                self.preshipment_details["street_line_two"],
-                self.preshipment_details["city"],
-                self.preshipment_details["state_code"],
-                self.preshipment_details["postal_code"],
-            )
-
         results = {
             "recipient_name": self.name_is_valid(self.preshipment_details["recipient_name"]),
             "recipient_email": self.email_is_valid(self.preshipment_details["recipient_email"]),
@@ -150,9 +146,19 @@ class Processor:
             "city": self.required_text_is_valid(self.preshipment_details["city"]),
             "state_code": self.state_is_valid(self.preshipment_details["state_code"]),
             "postal_code": self.required_text_is_valid(self.preshipment_details["postal_code"]),
-            "address_type": self.preshipment_details["address_is_commercial"] in (0, 1),
-            "address_valid": self.address_is_confirmed(address_check_response)
+            "address_type": self.preshipment_details["address_is_commercial"] in (0, 1)
         }
+
+        if results["street_line_one"]:
+            address_check_response = self.request_address_validation(
+                    self.preshipment_details["street_line_one"],
+                    self.preshipment_details["street_line_two"],
+                    self.preshipment_details["city"],
+                    self.preshipment_details["state_code"],
+                    self.preshipment_details["postal_code"],
+                )
+
+            results["address_valid"] = self.address_is_confirmed(address_check_response)
 
         return results
 
@@ -209,18 +215,40 @@ class Processor:
         return rates
 
 
-    def request_address_validation(self, street_line_one, street_line_two, city, state_code, postal_code):
-        address_from_entry = self.normalize_address(
-                street_line_one,
-                street_line_two,
-                city,
-                state_code,
-                postal_code,
+    def suggested_address_to_preshipment_address(self):
+        self.preshipment_details["street_line_one"] = self.suggested_address["street_line_one"]
+        self.preshipment_details["street_line_two"] = self.suggested_address["street_line_two"]
+        self.preshipment_details["city"] = self.suggested_address["city"]
+        self.preshipment_details["state_code"] = self.suggested_address["state_code"]
+        self.preshipment_details["postal_code"] = self.suggested_address["postal_code"]
+        self.preshipment_details["address_is_commercial"] = self.suggested_address["address_is_commercial"]
+
+
+    def set_suggested_address(self, address, is_commercial):
+        self.suggested_address["street_line_one"] = address.street_line_one
+        self.suggested_address["street_line_two"] = address.street_line_two
+        self.suggested_address["city"] = address.city
+        self.suggested_address["state_code"] = address.state_code
+        self.suggested_address["postal_code"] = address.postal_code
+        self.suggested_address["address_is_commercial"] = is_commercial
+
+
+    def get_suggested_address(self):
+        address = self.build_address_obj(
+                self.preshipment_details["street_line_one"],
+                self.preshipment_details["street_line_two"],
+                self.preshipment_details["city"],
+                self.preshipment_details["state_code"],
+                self.preshipment_details["postal_code"],
             )
 
-        response = self.validate_fedex_address(address_from_entry)
+        response = request_suggested_address(self.sandbox_token, self.production_token, address, validation_API_config).json()["output"]["resolvedAddresses"][0]
 
-        return response
+        confirmed_address = self.address_is_confirmed(response)
+        suggested_address = self.address_from_response(response)
+        address_classification = self.classification_from_response(response)
+
+        return confirmed_address, suggested_address, address_classification
 
 
     def address_from_response(self, response):
@@ -238,7 +266,7 @@ class Processor:
         state_code = response.get("stateOrProvinceCode")
         postal_code = response.get("postalCode")
 
-        corrected_address = self.normalize_address(
+        corrected_address = self.build_address_obj(
             street_line_one,
             street_line_two,
             city,
@@ -267,7 +295,7 @@ class Processor:
 
 
     @staticmethod
-    def normalize_address(street_line_one, street_line_two, city, state_code, postal_code):
+    def build_address_obj(street_line_one, street_line_two, city, state_code, postal_code):
         return Address(
             street_line_one=street_line_one or "",
             street_line_two=street_line_two or "",
@@ -275,12 +303,6 @@ class Processor:
             state_code=state_code or "",
             postal_code=postal_code or "",
         )
-
-
-    def validate_fedex_address(self, address):
-        response = request_address_completion(self.sandbox_token, self.production_token, address, validation_API_config).json()["output"]["resolvedAddresses"][0]
-
-        return response
 
 
     @staticmethod
