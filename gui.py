@@ -420,10 +420,6 @@ class GUI:
         return
 
 
-    def update_suggested_address(self, address, is_commercial):
-        self.processor.set_suggested_address(address, is_commercial)
-
-
     def display_address_suggestion_failure_message(self):
         raise ValueError("Failed to retrieve address suggestion for the entered details.")
 
@@ -431,10 +427,24 @@ class GUI:
     def suggest_address(self):
         self.sync_preshipment_details_from_gui_to_processor()
         success, address, is_commercial = self.processor.get_suggested_address()
+
         if success:
-            self.update_suggested_address(address, is_commercial)
+            self.processor.set_suggested_address(address, is_commercial)
+            self.display_suggested_address()
         else:
             self.display_address_suggestion_failure_message()
+
+
+    def display_suggested_address(self):
+        address = self.processor.suggested_address
+
+        if not address["street_line_two"]:
+            text = f"{address["street_line_one"]}, {address["city"]}, {address["state_code"]} {address["postal_code"]}"
+        else:
+            text = f"{address["street_line_one"]} {address["street_line_two"]}, {address["city"]}, {address["state_code"]} {address["postal_code"]}"
+
+        self.suggested_address_display.set(text)
+        self.suggestion_status.configure(text="SQUIDWARD IS THT U")
 
 
     def use_suggested_address(self):
