@@ -15,6 +15,9 @@ class GUI:
         self.root = tkinter.Tk()
         self.root.title("FedEx Shipping Label Generator")
 
+        self.main_font = "Segoe UI"
+        self.secondary_font = "Segoe UI Symbol"
+        
         assets_dir = Path(__file__).parent
 
         company_icon = Image.open(assets_dir / "company_icon.png")
@@ -42,7 +45,7 @@ class GUI:
         self.fedex_logo_image = ImageTk.PhotoImage(fedex_image)
 
         tkinter.Label(header_inner, image=self.fedex_logo_image, bg=self.colors["bg"], borderwidth=0).pack(side="left", padx=(0, 12))
-        ttk.Label(header_inner, text="Shipping Label Generator", font=("Segoe UI", 18, "bold")).pack(side="left")
+        ttk.Label(header_inner, text="Shipping Label Generator", font=(self.main_font, 18, "bold")).pack(side="left")
 
         self.rp_outer_frame = ttk.Frame(self.main_frame, padding=(12, 10), style="Card.TFrame")
         self.rp_outer_frame.grid(row=1, column=0, sticky="ew", pady=(0, 15))
@@ -51,7 +54,7 @@ class GUI:
         self.rp_frame = ttk.Frame(self.rp_outer_frame, style="CardInterior.TFrame")
         self.rp_frame.grid(row=0, column=0)
 
-        ttk.Label(self.rp_frame, text="RequestPortal Number", style="Card.TLabel", font=("Segoe UI", 15, "bold")).pack(pady=(0, 5))
+        ttk.Label(self.rp_frame, text="RequestPortal Number", style="Card.TLabel", font=(self.main_font, 15, "bold")).pack(pady=(0, 5))
 
         rp_controls_frame = ttk.Frame(self.rp_frame, style="CardInterior.TFrame")
         rp_controls_frame.pack()
@@ -122,6 +125,17 @@ class GUI:
         self.retrieve_rates_button = ttk.Button(action_frame, text="Retrieve Rates", style="Primary.TButton", state="disabled", command=self.attempt_retrieve_rates)
         self.retrieve_rates_button.pack(side="left", padx=7)
 
+        lock_image = Image.open(Path(__file__).parent / "lock.png").convert("RGBA")
+        lock_image = lock_image.resize((18, 18), Image.Resampling.LANCZOS)
+        self.lock_icon = ImageTk.PhotoImage(lock_image)
+
+        check_image = Image.open(Path(__file__).parent / "circle-check.png").convert("RGBA")
+        check_image = check_image.resize((18, 18), Image.Resampling.LANCZOS)
+        self.check_icon = ImageTk.PhotoImage(check_image)
+
+        self.retrieve_rates_hint = ttk.Label(action_frame, text="Select an address first", image=self.lock_icon, compound="left", style="ActionHint.TLabel")
+        self.retrieve_rates_hint.pack(side="left", padx=(6, 0))
+
 
     def configure_styles(self):
         self.colors = {
@@ -131,6 +145,7 @@ class GUI:
             "border": "#ccd8e6",
             "ink": "#263449",
             "subtitle": "#67798f",
+            "success": "#188038",
 
             "suggestion_bg": "#f3f7fd",
             "suggestion_border": "#b8cce7",
@@ -155,45 +170,42 @@ class GUI:
         style = ttk.Style(self.root)
         style.theme_use("clam")
 
-        style.configure("Required.TLabel", background=c["surface"], foreground=c["asterisk"], font=("Segoe UI", 10, "bold"))
-
+        style.configure("Required.TLabel", background=c["surface"], foreground=c["asterisk"], font=(self.main_font, 10, "bold"))
         style.configure("TFrame", background=c["bg"])
         style.configure("Card.TFrame", background=c["surface"], relief="solid", borderwidth=1, bordercolor=c["border"])
         style.configure("CardInterior.TFrame", background=c["surface"], borderwidth=0, relief="flat")
-        style.configure("TLabel", background=c["bg"], foreground=c["ink"], font=("Segoe UI", 10))
-        style.configure("Card.TLabel", background=c["surface"], foreground=c["ink"], font=("Segoe UI", 10))
-        style.configure("Hint.TLabel", background=c["surface"], foreground=c["subtitle"], font=("Segoe UI", 9))
-        style.configure("Error.TLabel", background=c["surface"], foreground=c["hover"], font=("Segoe UI", 10))
-
-        style.configure("TEntry", fieldbackground="white", bordercolor=c["border"], lightcolor=c["border"], darkcolor=c["border"], relief="flat", borderwidth=1, padding=4, font=("Segoe UI", 10))
+        style.configure("TLabel", background=c["bg"], foreground=c["ink"], font=(self.main_font, 10))
+        style.configure("Card.TLabel", background=c["surface"], foreground=c["ink"], font=(self.main_font, 10))
+        style.configure("Hint.TLabel", background=c["surface"], foreground=c["subtitle"], font=(self.main_font, 9))
+        style.configure("Error.TLabel", background=c["surface"], foreground=c["hover"], font=(self.main_font, 10))
+        style.configure("ActionHint.TLabel", background=c["bg"], foreground=c["subtitle"], font=(self.main_font, 9))
+        style.configure("ActionHintSuccess.TLabel", background=c["bg"], foreground=c["success"], font=(self.main_font, 9, "bold"))
+        style.configure("TEntry", fieldbackground="white", bordercolor=c["border"], lightcolor=c["border"], darkcolor=c["border"], relief="flat", borderwidth=1, padding=4, font=(self.main_font, 10))
         style.map("TEntry", bordercolor=[("focus", c["input_focus"])])
-
-        style.configure("TCombobox", fieldbackground="white", background=c["combobox"], bordercolor=c["border"], lightcolor=c["border"], darkcolor=c["border"], padding=4, font=("Segoe UI", 10))
+        style.configure("TCombobox", fieldbackground="white", background=c["combobox"], bordercolor=c["border"], lightcolor=c["border"], darkcolor=c["border"], padding=4, font=(self.main_font, 10))
         style.map("TCombobox", fieldbackground=[("readonly", "white")])
-
-        style.configure("TButton", background=c["button"], foreground=c["ink"], borderwidth=1, relief="flat", bordercolor=c["border"], padding=(10, 5), font=("Segoe UI", 10))
+        style.configure("TButton", background=c["button"], foreground=c["ink"], borderwidth=1, relief="flat", bordercolor=c["border"], padding=(10, 5), font=(self.main_font, 10))
         style.map("TButton", background=[("active", c["button_hover"])])
-
-        style.configure("Icon.TButton", background=c["button"], foreground=c["ink"], bordercolor=c["border"], borderwidth=1, relief="flat", padding=(4, 3), font=("Segoe UI Symbol", 11))
+        style.configure("Icon.TButton", background=c["button"], foreground=c["ink"], bordercolor=c["border"], borderwidth=1, relief="flat", padding=(4, 3), font=(self.secondary_font, 11))
         style.map("Icon.TButton", background=[("active", c["button_hover"])])
-
-        style.configure("Primary.TButton", background=c["primary"], foreground="white", bordercolor=c["primary"], padding=(14, 5), font=("Segoe UI", 10, "bold"))
+        style.configure("Primary.TButton", background=c["primary"], foreground="white", bordercolor=c["primary"], padding=(14, 5), font=(self.main_font, 11, "bold"))
         style.map("Primary.TButton", background=[("disabled", c["button"]), ("active", c["primary_hover"])], foreground=[("disabled", c["subtitle"]), ("active", "white")], bordercolor=[("disabled", c["border"])])
-
-        style.configure("Card.TRadiobutton", background="white", foreground=c["ink"], font=("Segoe UI", 10))
-
-        style.configure("Compact.TButton", padding=(8, 2), font=("Segoe UI", 9))
-
-        style.configure("CompactPrimary.TButton", background=c["primary"], foreground="white", bordercolor=c["primary"], padding=(8, 2), font=("Segoe UI", 9, "bold"))
+        style.configure("Card.TRadiobutton", background="white", foreground=c["ink"], font=(self.main_font, 10))
+        style.configure("Compact.TButton", background=c["primary"], foreground="white", padding=(8, 2), font=(self.main_font, 9))
+        style.map("Compact.TButton", background=[("disabled", c["button"]), ("active", c["primary_hover"])],
+                  foreground=[("disabled", c["subtitle"]), ("active", "white")],
+                  bordercolor=[("disabled", c["border"])])
+        style.configure("CompactSelected.TButton", background=c["primary"], foreground="white", bordercolor=c["primary"], padding=(8, 2), font=(self.main_font, 9, "bold"))
+        style.map("CompactSelected.TButton", background=[("active", c["primary_hover"])], foreground=[("active", "white")])
+        style.configure("CompactPrimary.TButton", background=c["primary"], foreground="white", bordercolor=c["primary"], padding=(8, 2), font=(self.main_font, 9, "bold"))
         style.map("CompactPrimary.TButton", background=[("active", c["primary_hover"])], foreground=[("active", "white")])
-
         style.configure("SuggestionCard.TFrame", background=c["suggestion_bg"], bordercolor=c["suggestion_border"], borderwidth=1, relief="solid")
         style.configure("SuggestionBody.TFrame", background=c["suggestion_bg"])
-        style.configure("Suggestion.TLabel", background=c["suggestion_bg"], foreground=c["ink"], font=("Segoe UI", 9, "bold"))
-        style.configure("SuggestionNote.TLabel", background=c["suggestion_bg"], foreground=c["subtitle"], font=("Segoe UI", 9))
+        style.configure("Suggestion.TLabel", background=c["suggestion_bg"], foreground=c["ink"], font=(self.main_font, 9, "bold"))
+        style.configure("SuggestionNote.TLabel", background=c["suggestion_bg"], foreground=c["subtitle"], font=(self.main_font, 9))
         style.configure("Suggestion.TEntry", fieldbackground=c["suggestion_field"], bordercolor=c["suggestion_border"], foreground=c["ink"], padding=3)
         style.map("Suggestion.TEntry", fieldbackground=[("readonly", c["suggestion_field"])], foreground=[("readonly", c["ink"])])
-        style.configure("SuggestAction.TButton", background=c["suggestion_button"], foreground=c["primary"], bordercolor=c["suggestion_border"], borderwidth=1, padding=(12, 4), font=("Segoe UI", 10, "bold"))
+        style.configure("SuggestAction.TButton", background=c["suggestion_button"], foreground=c["primary"], bordercolor=c["suggestion_border"], borderwidth=1, padding=(12, 4), font=(self.main_font, 10, "bold"))
         style.map("SuggestAction.TButton", background=[("active", c["button_hover"])], foreground=[("active", c["primary"])])
 
 
@@ -215,7 +227,7 @@ class GUI:
         recipient_frame.grid(row=0, column=0, sticky="ew")
         recipient_frame.columnconfigure(1, weight=1)
 
-        self.recipient_header = tkinter.Label(recipient_frame, text="Recipient", anchor="w", padx=12, pady=2, bg=self.colors["muted"], fg=self.colors["ink"], font=("Segoe UI", 12, "bold"))
+        self.recipient_header = tkinter.Label(recipient_frame, text="Recipient", anchor="w", padx=12, pady=2, bg=self.colors["muted"], fg=self.colors["ink"], font=(self.main_font, 12, "bold"))
         self.recipient_header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 12))
 
         self.create_field_label(recipient_frame, "Name", 1, required=True)
@@ -232,7 +244,7 @@ class GUI:
         other_frame.grid(row=1, column=0, sticky="ew")
         other_frame.columnconfigure(1, weight=1)
 
-        self.other_header = tkinter.Label(other_frame, text="Other", anchor="w", padx=12, pady=2, bg=self.colors["muted"], fg=self.colors["ink"], font=("Segoe UI", 12, "bold"))
+        self.other_header = tkinter.Label(other_frame, text="Other", anchor="w", padx=12, pady=2, bg=self.colors["muted"], fg=self.colors["ink"], font=(self.main_font, 12, "bold"))
         self.other_header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 12))
 
         fields = [
@@ -255,7 +267,7 @@ class GUI:
         address_frame.grid(row=0, column=1, sticky="nsew", padx=(7, 0))
         address_frame.columnconfigure(1, weight=1)
 
-        self.address_header = tkinter.Label(address_frame, text="Address", anchor="w", padx=12, pady=2, bg=self.colors["muted"], fg=self.colors["ink"], font=("Segoe UI", 12, "bold"))
+        self.address_header = tkinter.Label(address_frame, text="Address", anchor="w", padx=12, pady=2, bg=self.colors["muted"], fg=self.colors["ink"], font=(self.main_font, 12, "bold"))
         self.address_header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 12))
 
         self.create_field_label(address_frame, "Street line 1", row=1, required=True, pady=4)
@@ -305,15 +317,21 @@ class GUI:
         self.suggestion_request_view.columnconfigure(0, weight=1)
         self.suggestion_request_view.rowconfigure(0, weight=1)
 
-        self.suggest_address_button = ttk.Button(self.suggestion_request_view, text="📍Suggest Address", style="SuggestAction.TButton", command=self.suggest_address)
+        pin_image = Image.open(Path(__file__).parent / "map-pin.png").convert("RGBA")
+        pin_image = pin_image.resize((18, 18), Image.Resampling.LANCZOS)
+        self.pin_icon = ImageTk.PhotoImage(pin_image)
+
+        self.suggest_address_button = ttk.Button(self.suggestion_request_view, text="Suggest Address", image=self.pin_icon, compound="left", style="SuggestAction.TButton", command=self.suggest_address)
         self.suggest_address_button.grid(row=0, column=0)
+
+#        ttk.Label(self.suggestion_request_view, text="Choose an address version to enable rates", style="SuggestionNote.TLabel").grid(row=1, column=0, pady=(2, 0))
 
         # View 2
         self.suggestion_result_view = ttk.Frame(self.suggestion_panel, style="SuggestionBody.TFrame")
         self.suggestion_result_view.grid(row=0, column=0, sticky="nsew")
         self.suggestion_result_view.columnconfigure(0, weight=1)
 
-        ttk.Label(self.suggestion_result_view, text="Suggested Address", style="Suggestion.TLabel").grid(row=0, column=0, sticky="w", pady=(0, 3))
+        ttk.Label(self.suggestion_result_view, text="Address Review - Choose an Option", style="Suggestion.TLabel").grid(row=0, column=0, sticky="w", pady=(0, 3))
 
         self.suggested_address_display = tkinter.StringVar(value="")
         self.suggested_address_entry = ttk.Entry(self.suggestion_result_view, textvariable=self.suggested_address_display, state="readonly", style="Suggestion.TEntry", takefocus=False)
@@ -379,29 +397,33 @@ class GUI:
 
 
     def handle_rp_paste(self, event=None):
-        pasted_text = self.root.clipboard_get().strip()
+        try:
+            pasted_text = self.root.clipboard_get().strip()
+        except tkinter.TclError:
+            self.rp_error_label.configure(
+                text="Clipboard is empty or contains no text."
+            )
+            return "break"
 
         request_number = self.extract_rp_number(pasted_text)
 
         if request_number is not None:
             self.rp_number_entry.delete(0, tkinter.END)
             self.rp_number_entry.insert(0, request_number)
-
-            return "break"
-
-        if pasted_text.startswith(rp_url_prefix):
+            self.rp_error_label.configure(text="")
             return "break"
 
 
     def show_suggestion_request_view(self):
         self.suggest_address_button.configure(state="normal")
 
-        self.use_suggested_button.configure(state="disabled")
-        self.use_entered_button.configure(state="disabled")
+        self.use_suggested_button.configure(state="disabled", style="Compact.TButton")
+        self.use_entered_button.configure(state="disabled", style="Compact.TButton")
+
         self.retrieve_rates_button.configure(state="disabled")
+        self.retrieve_rates_hint.configure(text="Select an address first", image=self.lock_icon, style="ActionHint.TLabel")
 
         self.suggested_address_display.set("")
-
         self.suggestion_request_view.tkraise()
 
 
@@ -523,17 +545,25 @@ class GUI:
         self.suggested_address_display.set(text)
 
 
+    def indicate_address_choice(self, choice: str):
+        self.use_suggested_button.configure(style="CompactSelected.TButton" if choice == "suggested" else "Compact.TButton")
+        self.use_entered_button.configure(style="CompactSelected.TButton" if choice == "entered" else "Compact.TButton")
+        self.retrieve_rates_button.configure(state="normal")
+        self.retrieve_rates_hint.configure(text="Address selected", image=self.check_icon, compound="left", style="ActionHintSuccess.TLabel")
+
+
     def use_suggested_address(self):
         self.processor.suggested_address_to_preshipment_address()
+
         self._updating_address = True
         self.sync_preshipment_details_from_processor_to_gui()
         self._updating_address = False
 
-        self.retrieve_rates_button.configure(state="normal")
+        self.indicate_address_choice("suggested")
 
 
     def use_address_as_entered(self):
-        self.retrieve_rates_button.configure(state="normal")
+        self.indicate_address_choice("entered")
 
 
     def run(self):

@@ -1,5 +1,5 @@
 import requests
-from api_settings import APIEnvironment
+from config import APIEnvironment
 from payload_builders import build_address_validation_payload, build_fedex_ship_payload, build_fedex_rates_payload
 from schema_classes import RatesOption, RatesOptions
 from private import (
@@ -22,6 +22,8 @@ def request_access_token(api_key, secret_key, environment):
         'client_secret': secret_key,
     }
     response = requests.post(url, data=payload, headers=headers, timeout=30)
+
+    print(f"Token request status code: {response.status_code}")
     response.raise_for_status()
     token = response.json().get("access_token")
     if not token:
@@ -46,7 +48,10 @@ def request_suggested_address(sandbox_auth_token, production_auth_token, address
         'Authorization': f"Bearer {token}"
     }
 
-    response = requests.post(url, json=payload, headers=headers)
+    response = requests.post(url, json=payload, headers=headers, timeout=30)
+
+    print(f"Address validation status code: {response.status_code}")
+    response.raise_for_status()
 
     return response
 
@@ -106,7 +111,7 @@ def request_shipping_label(sandbox_auth_token, production_auth_token, shipment_d
 
     label_payload = build_fedex_ship_payload(shipment_data, account_number)
     response = requests.post(url, json=label_payload, headers=headers, timeout=30)
-    #    print(response.text)
+
     print(f"Label creation status code: {response.status_code}")
 
     response.raise_for_status()

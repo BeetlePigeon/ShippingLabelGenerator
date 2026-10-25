@@ -1,5 +1,4 @@
 def retrieve_rates(self):
-    return
     shipment_data = build_shipment_data(example_input)
     available_rates = populate_rates_options(self.sandbox_token, self.production_token, shipment_data, rates_API_config)
 
@@ -82,20 +81,3 @@ def save_label(response_data, label_recipient_name):
     output_directory.mkdir(exist_ok=True)
     label_path = output_directory / f"{label_recipient_name}_{tracking_number}.pdf"
     label_path.write_bytes(label_bytes)
-
-
-example_input = InputData(
-    street_line_one="308 Negra Arroyo Lane",
-    street_line_two="Apt 737",
-    city="Albuquerque",
-    state_code="NM",
-    postal_code="87104",
-    country_code="US",
-    name="Walter White",
-    email_address="alborz796@gmail.com",
-    phone_number="505-503-4455",
-    address_is_commercial=False,
-    reference="REFNUM",
-    shipment_weight=10,
-    other_emails_to_notify=["alborzzzz@yahoo.com"]
-)

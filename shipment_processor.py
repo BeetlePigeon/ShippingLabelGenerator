@@ -3,7 +3,7 @@ import re
 from scraper import Scraper
 from parser import Parser
 from tables import state_codes
-from api_settings import APIEnvironment, rates_API_config, validation_API_config
+from config import APIEnvironment, rates_API_config, validation_API_config, DEFAULT_SHIPMENT_WEIGHT
 from api_requests import request_access_token, request_suggested_address, request_rates_options
 from schema_classes import Address, Shipment
 from private import (
@@ -191,7 +191,7 @@ class Processor:
             recipient_address_is_commercial=bool(self.preshipment_details["address_is_commercial"]),
 
             reference=self.preshipment_details["reference"],
-            weight=self.preshipment_details["weight"],
+            weight=self.preshipment_details["weight"] or DEFAULT_SHIPMENT_WEIGHT,
             other_email_1=self.preshipment_details["other_email_1"],
             other_email_2=self.preshipment_details["other_email_2"],
             other_email_3=self.preshipment_details["other_email_3"],
@@ -233,7 +233,14 @@ class Processor:
                 self.preshipment_details["postal_code"],
             )
 
-        response = request_suggested_address(self.sandbox_token, self.production_token, address, validation_API_config).json()["output"]["resolvedAddresses"][0]
+        data = request_suggested_address(self.sandbox_token, self.production_token, address, validation_API_config).json()
+
+        resolved_addresses = data.get("output", {}).get("resolvedAddresses") or []
+
+        if not resolved_addresses:
+            raise ValueError("FedEx returned no resolved addresses.")
+
+        response = resolved_addresses[0]
 
         confirmed_address = self.address_is_confirmed(response)
         suggested_address = self.address_from_response(response)
