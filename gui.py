@@ -99,6 +99,19 @@ class GUI:
 
         self.create_preshipment_sections()
 
+        self._updating_address = False
+        address_variables = (
+            self.street_line_one,
+            self.street_line_two,
+            self.city,
+            self.state_code,
+            self.postal_code,
+            self.address_is_commercial
+        )
+
+        for variable in address_variables:
+            variable.trace_add("write", self.on_address_changed)
+
         action_frame = ttk.Frame(self.main_frame)
         action_frame.grid(row=3, column=0, pady=(8, 0))
 
@@ -117,6 +130,11 @@ class GUI:
             "border": "#ccd8e6",
             "ink": "#263449",
             "subtitle": "#67798f",
+
+            "suggestion_bg": "#f3f7fd",
+            "suggestion_border": "#b8cce7",
+            "suggestion_field": "#e8f0fa",
+            "suggestion_button": "#dceafe",
 
             "primary": "#4878b7",
             "primary_hover": "#3968a5",
@@ -167,6 +185,15 @@ class GUI:
 
         style.configure("CompactPrimary.TButton", background=c["primary"], foreground="white", bordercolor=c["primary"], padding=(8, 2), font=("Segoe UI", 9, "bold"))
         style.map("CompactPrimary.TButton", background=[("active", c["primary_hover"])], foreground=[("active", "white")])
+
+        style.configure("SuggestionCard.TFrame", background=c["suggestion_bg"], bordercolor=c["suggestion_border"], borderwidth=1, relief="solid")
+        style.configure("SuggestionBody.TFrame", background=c["suggestion_bg"])
+        style.configure("Suggestion.TLabel", background=c["suggestion_bg"], foreground=c["ink"], font=("Segoe UI", 9, "bold"))
+        style.configure("SuggestionNote.TLabel", background=c["suggestion_bg"], foreground=c["subtitle"], font=("Segoe UI", 9))
+        style.configure("Suggestion.TEntry", fieldbackground=c["suggestion_field"], bordercolor=c["suggestion_border"], foreground=c["ink"], padding=3)
+        style.map("Suggestion.TEntry", fieldbackground=[("readonly", c["suggestion_field"])], foreground=[("readonly", c["ink"])])
+        style.configure("SuggestAction.TButton", background=c["suggestion_button"], foreground=c["primary"], bordercolor=c["suggestion_border"], borderwidth=1, padding=(12, 4), font=("Segoe UI", 10, "bold"))
+        style.map("SuggestAction.TButton", background=[("active", c["button_hover"])], foreground=[("active", c["primary"])])
 
 
     def create_field_label(self, parent, text, row, column=0, required=False, padx=5, pady=3):
@@ -267,25 +294,50 @@ class GUI:
 
         address_frame.rowconfigure(4, weight=1)
 
-        self.suggest_address_button = ttk.Button(address_frame, text="Suggest Address", style="Compact.TButton", command=self.suggest_address)
-        self.suggest_address_button.grid(row=5, column=0, columnspan=2, sticky="w", padx=5, pady=(0, 4))
+        self.suggestion_panel = ttk.Frame(address_frame, style="SuggestionCard.TFrame", padding=(8, 6))
+        self.suggestion_panel.grid(row=5, column=0, columnspan=2, sticky="ew", padx=5, pady=(0, 2))
+        self.suggestion_panel.columnconfigure(0, weight=1)
 
-        ttk.Label(address_frame, text="Suggested Address", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=6, column=0, columnspan=2, sticky="w", padx=5, pady=(0, 2))
+        # View 1
+        self.suggestion_request_view = ttk.Frame(self.suggestion_panel, style="SuggestionBody.TFrame")
+        self.suggestion_request_view.grid(row=0, column=0, sticky="nsew")
+        self.suggestion_request_view.columnconfigure(0, weight=1)
+        self.suggestion_request_view.rowconfigure(0, weight=1)
+
+        self.suggest_address_button = ttk.Button(self.suggestion_request_view, text="📍Suggest Address", style="SuggestAction.TButton", command=self.suggest_address)
+        self.suggest_address_button.grid(row=0, column=0)
+
+        # View 2
+        self.suggestion_result_view = ttk.Frame(self.suggestion_panel, style="SuggestionBody.TFrame")
+        self.suggestion_result_view.grid(row=0, column=0, sticky="nsew")
+        self.suggestion_result_view.columnconfigure(0, weight=1)
+
+        ttk.Label(self.suggestion_result_view, text="Suggested Address", style="Suggestion.TLabel").grid(row=0, column=0, sticky="w", pady=(0, 3))
+
         self.suggested_address_display = tkinter.StringVar(value="")
-        self.suggested_address_entry = ttk.Entry(address_frame, textvariable=self.suggested_address_display, state="readonly")
-        self.suggested_address_entry.grid(row=7, column=0, columnspan=2, sticky="ew", padx=5, pady=(0, 3))
+        self.suggested_address_entry = ttk.Entry(self.suggestion_result_view, textvariable=self.suggested_address_display, state="readonly", style="Suggestion.TEntry", takefocus=False)
+        self.suggested_address_entry.grid(row=1, column=0, sticky="ew")
 
-        choice_frame = ttk.Frame(address_frame, style="CardInterior.TFrame")
-        choice_frame.grid(row=8, column=0, columnspan=2, pady=(0, 2))
+        self.no_suggestion_label = ttk.Label(self.suggestion_result_view, text="FedEx could not confirm a suggested address.", style="SuggestionNote.TLabel", padding=(6, 5))
+        self.no_suggestion_label.grid(row=1, column=0, sticky="ew")
 
-        self.use_suggested_button = ttk.Button(choice_frame, text="Use Suggested Address", style="CompactPrimary.TButton", state="disabled", command=self.use_suggested_address)
+        choice_frame = ttk.Frame(self.suggestion_result_view, style="SuggestionBody.TFrame")
+        choice_frame.grid(row=2, column=0, pady=(5, 0))
+
+        self.use_suggested_button = ttk.Button(choice_frame, text="Use Suggested Address", style="Compact.TButton", state="disabled", command=self.use_suggested_address)
         self.use_suggested_button.pack(side="left", padx=(0, 5))
 
         self.use_entered_button = ttk.Button(choice_frame, text="Use Address As Entered", style="Compact.TButton", state="disabled", command=self.use_address_as_entered)
         self.use_entered_button.pack(side="left", padx=(5, 0))
 
-        self.suggestion_status = ttk.Label(address_frame, text="", style="Card.TLabel")
-        self.suggestion_status.grid(row=8, column=0, columnspan=2, sticky="w", padx=5, pady=(6, 2))
+        self.suggestion_request_view.tkraise()
+
+
+    def on_address_changed(self, *args):
+        if self._updating_address:
+            return
+
+        self.show_suggestion_request_view()
 
 
     @staticmethod
@@ -338,6 +390,32 @@ class GUI:
 
         if pasted_text.startswith(rp_url_prefix):
             return "break"
+
+
+    def show_suggestion_request_view(self):
+        self.suggest_address_button.configure(state="normal")
+
+        self.use_suggested_button.configure(state="disabled")
+        self.use_entered_button.configure(state="disabled")
+
+        self.suggested_address_display.set("")
+
+        self.suggestion_request_view.tkraise()
+
+
+    def show_suggestion_result_view(self, confirmed: bool):
+        self.suggest_address_button.configure(state="disabled")
+
+        if confirmed:
+            self.suggested_address_entry.tkraise()
+            self.use_suggested_button.configure(state="normal")
+        else:
+            self.no_suggestion_label.tkraise()
+            self.use_suggested_button.configure(state="disabled")
+
+        self.use_entered_button.configure(state="normal")
+
+        self.suggestion_result_view.tkraise()
 
 
     def clear_preshipment_widgets(self):
@@ -398,7 +476,6 @@ class GUI:
         }
 
         self.processor.preshipment_details.update(details)
-        self.sync_preshipment_details_from_processor_to_gui()
 
 
     def attempt_retrieve_rates(self):
@@ -426,13 +503,15 @@ class GUI:
 
     def suggest_address(self):
         self.sync_preshipment_details_from_gui_to_processor()
-        success, address, is_commercial = self.processor.get_suggested_address()
+        confirmed, address, is_commercial = self.processor.get_suggested_address()
 
-        if success:
+        if confirmed is True:
             self.processor.set_suggested_address(address, is_commercial)
             self.display_suggested_address()
         else:
-            self.display_address_suggestion_failure_message()
+            self.suggested_address_display.set("")
+
+        self.show_suggestion_result_view(confirmed=confirmed is True)
 
 
     def display_suggested_address(self):
@@ -444,12 +523,17 @@ class GUI:
             text = f"{address["street_line_one"]} {address["street_line_two"]}, {address["city"]}, {address["state_code"]} {address["postal_code"]}"
 
         self.suggested_address_display.set(text)
-        self.suggestion_status.configure(text="SQUIDWARD IS THT U")
 
 
     def use_suggested_address(self):
         self.processor.suggested_address_to_preshipment_address()
-        self.sync_preshipment_details_from_processor_to_gui()
+
+        self._updating_address = True
+        try:
+            self.sync_preshipment_details_from_processor_to_gui()
+
+        finally:
+            self._updating_address = False
 
 
     def use_address_as_entered(self):
