@@ -149,8 +149,6 @@ class Processor:
             "address_type": self.preshipment_details["address_is_commercial"] in (0, 1),
         }
 
-        results["address_valid"], _, _ = self.get_suggested_address()
-
         return results
 
 
@@ -240,11 +238,12 @@ class Processor:
         if not resolved_addresses:
             raise ValueError("FedEx returned no resolved addresses.")
 
-        response = resolved_addresses[0]
+        resolved_address = resolved_addresses[0]
 
-        confirmed_address = self.address_is_confirmed(response)
-        suggested_address = self.address_from_response(response)
-        address_classification = self.classification_from_response(response)
+        self.pretty_print(resolved_address)
+        confirmed_address = self.address_is_confirmed(resolved_address)
+        suggested_address = self.address_from_response(resolved_address)
+        address_classification = self.classification_from_response(resolved_address)
 
         return confirmed_address, suggested_address, address_classification
 
@@ -305,14 +304,14 @@ class Processor:
 
     @staticmethod
     def address_is_confirmed(response):
-        if response["customerMessages"]:
-            msg = response["customerMessages"][0]["code"]
-        else:
-            msg = None
+        messages = response.get("customerMessages") or []
+        msg = messages[0].get("code") if messages else None
 
-        address_type = response["attributes"]["AddressType"]
-        resolved = response["attributes"]["Resolved"]
-        dpv = response["attributes"]["DPV"]
+        attributes = response.get("attributes") or {}
+
+        address_type = attributes.get("AddressType")
+        resolved = attributes.get("Resolved")
+        dpv = attributes.get("DPV")
 
         if address_type == "STANDARDIZED" and resolved == "true" and dpv == "true":
             return True

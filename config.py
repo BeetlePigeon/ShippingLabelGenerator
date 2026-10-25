@@ -11,4 +11,4 @@ rates_API_config = APIEnvironment.PRODUCTION
 ship_API_config = APIEnvironment.PRODUCTION
 validation_API_config = APIEnvironment.PRODUCTION
 
-DEFAULT_SHIPMENT_WEIGHT = 8
+DEFAULT_SHIPMENT_WEIGHT = "8"

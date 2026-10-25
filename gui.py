@@ -17,7 +17,7 @@ class GUI:
 
         self.main_font = "Segoe UI"
         self.secondary_font = "Segoe UI Symbol"
-        
+
         assets_dir = Path(__file__).parent
 
         company_icon = Image.open(assets_dir / "company_icon.png")
@@ -133,7 +133,7 @@ class GUI:
         check_image = check_image.resize((18, 18), Image.Resampling.LANCZOS)
         self.check_icon = ImageTk.PhotoImage(check_image)
 
-        self.retrieve_rates_hint = ttk.Label(action_frame, text="Select an address first", image=self.lock_icon, compound="left", style="ActionHint.TLabel")
+        self.retrieve_rates_hint = ttk.Label(action_frame, text="Select address", image=self.lock_icon, compound="left", style="ActionHint.TLabel")
         self.retrieve_rates_hint.pack(side="left", padx=(6, 0))
 
 
@@ -321,7 +321,7 @@ class GUI:
         pin_image = pin_image.resize((18, 18), Image.Resampling.LANCZOS)
         self.pin_icon = ImageTk.PhotoImage(pin_image)
 
-        self.suggest_address_button = ttk.Button(self.suggestion_request_view, text="Suggest Address", image=self.pin_icon, compound="left", style="SuggestAction.TButton", command=self.suggest_address)
+        self.suggest_address_button = ttk.Button(self.suggestion_request_view, text="Validate Address", image=self.pin_icon, compound="left", style="SuggestAction.TButton", command=self.suggest_address)
         self.suggest_address_button.grid(row=0, column=0)
 
 #        ttk.Label(self.suggestion_request_view, text="Choose an address version to enable rates", style="SuggestionNote.TLabel").grid(row=1, column=0, pady=(2, 0))
@@ -421,7 +421,7 @@ class GUI:
         self.use_entered_button.configure(state="disabled", style="Compact.TButton")
 
         self.retrieve_rates_button.configure(state="disabled")
-        self.retrieve_rates_hint.configure(text="Select an address first", image=self.lock_icon, style="ActionHint.TLabel")
+        self.retrieve_rates_hint.configure(text="Select address", image=self.lock_icon, style="ActionHint.TLabel")
 
         self.suggested_address_display.set("")
         self.suggestion_request_view.tkraise()
