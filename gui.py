@@ -100,6 +100,7 @@ class GUI:
         self.create_preshipment_sections()
 
         self._updating_address = False
+
         address_variables = (
             self.street_line_one,
             self.street_line_two,
@@ -115,11 +116,11 @@ class GUI:
         action_frame = ttk.Frame(self.main_frame)
         action_frame.grid(row=3, column=0, pady=(8, 0))
 
-        self.retrieve_rates_button = ttk.Button(action_frame, text="Retrieve Rates", style="Primary.TButton", command=self.attempt_retrieve_rates)
-        self.retrieve_rates_button.pack(side="left", padx=7)
-
         self.clear_shipment_details_button = ttk.Button(action_frame, text="Clear All", command=self.clear_preshipment_widgets)
         self.clear_shipment_details_button.pack(side="left", padx=7)
+
+        self.retrieve_rates_button = ttk.Button(action_frame, text="Retrieve Rates", style="Primary.TButton", state="disabled", command=self.attempt_retrieve_rates)
+        self.retrieve_rates_button.pack(side="left", padx=7)
 
 
     def configure_styles(self):
@@ -177,7 +178,7 @@ class GUI:
         style.map("Icon.TButton", background=[("active", c["button_hover"])])
 
         style.configure("Primary.TButton", background=c["primary"], foreground="white", bordercolor=c["primary"], padding=(14, 5), font=("Segoe UI", 10, "bold"))
-        style.map("Primary.TButton", background=[("active", c["primary_hover"])], foreground=[("active", "white")])
+        style.map("Primary.TButton", background=[("disabled", c["button"]), ("active", c["primary_hover"])], foreground=[("disabled", c["subtitle"]), ("active", "white")], bordercolor=[("disabled", c["border"])])
 
         style.configure("Card.TRadiobutton", background="white", foreground=c["ink"], font=("Segoe UI", 10))
 
@@ -397,6 +398,7 @@ class GUI:
 
         self.use_suggested_button.configure(state="disabled")
         self.use_entered_button.configure(state="disabled")
+        self.retrieve_rates_button.configure(state="disabled")
 
         self.suggested_address_display.set("")
 
@@ -482,10 +484,10 @@ class GUI:
         self.sync_preshipment_details_from_gui_to_processor()
 
         results = self.processor.is_preshipment_valid()
-        address_checked = results.get("address_valid")
 
-        if address_checked and all(results.values()):
+        if all(results.values()):
             rates = self.processor.retrieve_rates()
+            print(rates)
 #            self.display_rates(rates)
 #            self.lock_preshipment_widgets()
 #            self.switch_to_create_label_buttons()
@@ -495,10 +497,6 @@ class GUI:
 
     def highlight_errors(self, results: dict) -> None:
         return
-
-
-    def display_address_suggestion_failure_message(self):
-        raise ValueError("Failed to retrieve address suggestion for the entered details.")
 
 
     def suggest_address(self):
@@ -527,17 +525,15 @@ class GUI:
 
     def use_suggested_address(self):
         self.processor.suggested_address_to_preshipment_address()
-
         self._updating_address = True
-        try:
-            self.sync_preshipment_details_from_processor_to_gui()
+        self.sync_preshipment_details_from_processor_to_gui()
+        self._updating_address = False
 
-        finally:
-            self._updating_address = False
+        self.retrieve_rates_button.configure(state="normal")
 
 
     def use_address_as_entered(self):
-        pass
+        self.retrieve_rates_button.configure(state="normal")
 
 
     def run(self):

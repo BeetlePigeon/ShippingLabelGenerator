@@ -146,19 +146,10 @@ class Processor:
             "city": self.required_text_is_valid(self.preshipment_details["city"]),
             "state_code": self.state_is_valid(self.preshipment_details["state_code"]),
             "postal_code": self.required_text_is_valid(self.preshipment_details["postal_code"]),
-            "address_type": self.preshipment_details["address_is_commercial"] in (0, 1)
+            "address_type": self.preshipment_details["address_is_commercial"] in (0, 1),
         }
 
-        if results["street_line_one"]:
-            address_check_response = self.request_address_validation(
-                    self.preshipment_details["street_line_one"],
-                    self.preshipment_details["street_line_two"],
-                    self.preshipment_details["city"],
-                    self.preshipment_details["state_code"],
-                    self.preshipment_details["postal_code"],
-                )
-
-            results["address_valid"] = self.address_is_confirmed(address_check_response)
+        results["address_valid"], _, _ = self.get_suggested_address()
 
         return results
 
