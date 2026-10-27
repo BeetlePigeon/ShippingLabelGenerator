@@ -100,6 +100,8 @@ class GUI:
         tkinter.StringVar(value=self.processor.preshipment_details["other_email_3"]),
             ]
 
+        self.widgets = {}
+
         self.create_preshipment_sections()
 
         self._updating_address = False
@@ -122,19 +124,8 @@ class GUI:
         self.clear_shipment_details_button = ttk.Button(action_frame, text="Clear All", command=self.clear_preshipment_widgets)
         self.clear_shipment_details_button.pack(side="left", padx=7)
 
-        self.retrieve_rates_button = ttk.Button(action_frame, text="Retrieve Rates", style="Primary.TButton", state="disabled", command=self.attempt_retrieve_rates)
+        self.retrieve_rates_button = ttk.Button(action_frame, text="Retrieve Rates", style="Primary.TButton", state="normal", command=self.attempt_retrieve_rates)
         self.retrieve_rates_button.pack(side="left", padx=7)
-
-        lock_image = Image.open(Path(__file__).parent / "lock.png").convert("RGBA")
-        lock_image = lock_image.resize((18, 18), Image.Resampling.LANCZOS)
-        self.lock_icon = ImageTk.PhotoImage(lock_image)
-
-        check_image = Image.open(Path(__file__).parent / "circle-check.png").convert("RGBA")
-        check_image = check_image.resize((18, 18), Image.Resampling.LANCZOS)
-        self.check_icon = ImageTk.PhotoImage(check_image)
-
-        self.retrieve_rates_hint = ttk.Label(action_frame, text="Select address", image=self.lock_icon, compound="left", style="ActionHint.TLabel")
-        self.retrieve_rates_hint.pack(side="left", padx=(6, 0))
 
 
     def configure_styles(self):
@@ -178,12 +169,14 @@ class GUI:
         style.configure("Card.TLabel", background=c["surface"], foreground=c["ink"], font=(self.main_font, 10))
         style.configure("Hint.TLabel", background=c["surface"], foreground=c["subtitle"], font=(self.main_font, 9))
         style.configure("Error.TLabel", background=c["surface"], foreground=c["hover"], font=(self.main_font, 10))
+        style.configure("AddressType.TFrame", background=c["surface"], bordercolor=c["surface"], borderwidth=1, relief="solid")
+        style.configure("InvalidAddressType.TFrame", background=c["surface"], bordercolor=c["asterisk"], borderwidth=1, relief="solid")
         style.configure("ActionHint.TLabel", background=c["bg"], foreground=c["subtitle"], font=(self.main_font, 9))
         style.configure("ActionHintSuccess.TLabel", background=c["bg"], foreground=c["success"], font=(self.main_font, 9, "bold"))
         style.configure("TEntry", fieldbackground="white", bordercolor=c["border"], lightcolor=c["border"], darkcolor=c["border"], relief="flat", borderwidth=1, padding=4, font=(self.main_font, 10))
-        style.map("TEntry", bordercolor=[("focus", c["input_focus"])])
+        style.map("TEntry", bordercolor=[("invalid", c["asterisk"]),("focus", c["input_focus"])])
         style.configure("TCombobox", fieldbackground="white", background=c["combobox"], bordercolor=c["border"], lightcolor=c["border"], darkcolor=c["border"], padding=4, font=(self.main_font, 10))
-        style.map("TCombobox", fieldbackground=[("readonly", "white")])
+        style.map("TCombobox", fieldbackground=[("readonly", "white")], bordercolor=[("invalid", c["asterisk"])])
         style.configure("TButton", background=c["button"], foreground=c["ink"], borderwidth=1, relief="flat", bordercolor=c["border"], padding=(10, 5), font=(self.main_font, 10))
         style.map("TButton", background=[("active", c["button_hover"])])
         style.configure("Icon.TButton", background=c["button"], foreground=c["ink"], bordercolor=c["border"], borderwidth=1, relief="flat", padding=(4, 3), font=(self.secondary_font, 11))
@@ -203,13 +196,15 @@ class GUI:
         style.configure("SuggestionBody.TFrame", background=c["suggestion_bg"])
         style.configure("Suggestion.TLabel", background=c["suggestion_bg"], foreground=c["ink"], font=(self.main_font, 9, "bold"))
         style.configure("SuggestionNote.TLabel", background=c["suggestion_bg"], foreground=c["subtitle"], font=(self.main_font, 9))
+        style.configure("SuggestionCheck.TLabel", background=c["suggestion_bg"], borderwidth=0, padding=0)
         style.configure("Suggestion.TEntry", fieldbackground=c["suggestion_field"], bordercolor=c["suggestion_border"], foreground=c["ink"], padding=3)
         style.map("Suggestion.TEntry", fieldbackground=[("readonly", c["suggestion_field"])], foreground=[("readonly", c["ink"])])
         style.configure("SuggestAction.TButton", background=c["suggestion_button"], foreground=c["primary"], bordercolor=c["suggestion_border"], borderwidth=1, padding=(12, 4), font=(self.main_font, 10, "bold"))
         style.map("SuggestAction.TButton", background=[("active", c["button_hover"])], foreground=[("active", c["primary"])])
 
 
-    def create_field_label(self, parent, text, row, column=0, required=False, padx=5, pady=3):
+    @staticmethod
+    def create_field_label(parent, text, row, column=0, required=False, padx=5, pady=3):
         label_frame = ttk.Frame(parent, style="CardInterior.TFrame")
         label_frame.grid(row=row, column=column, sticky="w", padx=padx, pady=pady)
 
@@ -223,91 +218,107 @@ class GUI:
         left_column.grid(row=0, column=0, sticky="nsew", padx=(0, 7))
         left_column.columnconfigure(0, weight=1)
 
-        recipient_frame = ttk.Frame(left_column, padding=4, style="Card.TFrame")
-        recipient_frame.grid(row=0, column=0, sticky="ew")
-        recipient_frame.columnconfigure(1, weight=1)
+        self.recipient_frame = ttk.Frame(left_column, padding=4, style="Card.TFrame")
+        self.recipient_frame.grid(row=0, column=0, sticky="ew")
+        self.recipient_frame.columnconfigure(1, weight=1)
 
-        self.recipient_header = tkinter.Label(recipient_frame, text="Recipient", anchor="w", padx=12, pady=2, bg=self.colors["muted"], fg=self.colors["ink"], font=(self.main_font, 12, "bold"))
+        self.recipient_header = tkinter.Label(self.recipient_frame, text="Recipient", anchor="w", padx=12, pady=2, bg=self.colors["muted"], fg=self.colors["ink"], font=(self.main_font, 12, "bold"))
         self.recipient_header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 12))
 
-        self.create_field_label(recipient_frame, "Name", 1, required=True)
-        ttk.Entry(recipient_frame, textvariable=self.recipient_name, width=36).grid(row=1, column=1, sticky="ew", padx=5, pady=3)
+        self.create_field_label(self.recipient_frame, "Name", 1, required=True)
+        self.widgets["recipient_name"] = ttk.Entry(self.recipient_frame, textvariable=self.recipient_name, width=36)
+        self.widgets["recipient_name"].grid(row=1, column=1, sticky="ew", padx=5, pady=3)
 
-        self.create_field_label(recipient_frame, "Email", 2, required=False)
-        ttk.Entry(recipient_frame, textvariable=self.recipient_email, width=36).grid(row=2, column=1, sticky="ew", padx=5, pady=3)
+        self.create_field_label(self.recipient_frame, "Email", 2, required=False)
+        self.widgets["recipient_email"] = ttk.Entry(self.recipient_frame, textvariable=self.recipient_email, width=36)
+        self.widgets["recipient_email"].grid(row=2, column=1, sticky="ew", padx=5, pady=3)
 
-        self.create_field_label(recipient_frame, "Phone", 3, required=False)
         phone_validation = (self.root.register(self.validate_phone_entry), "%P")
-        ttk.Entry(recipient_frame, textvariable=self.recipient_phone, width=36, validate="key", validatecommand=phone_validation).grid(row=3, column=1, sticky="ew", padx=5, pady=3)
+        self.create_field_label(self.recipient_frame, "Phone", 3, required=False)
+        self.widgets["recipient_phone"] = ttk.Entry(self.recipient_frame, textvariable=self.recipient_phone, width=36, validate="key", validatecommand=phone_validation)
+        self.widgets["recipient_phone"].grid(row=3, column=1, sticky="ew", padx=5, pady=3)
 
-        other_frame = ttk.Frame(left_column, padding=4, style="Card.TFrame")
-        other_frame.grid(row=1, column=0, sticky="ew")
-        other_frame.columnconfigure(1, weight=1)
+        self.other_frame = ttk.Frame(left_column, padding=4, style="Card.TFrame")
+        self.other_frame.grid(row=1, column=0, sticky="ew")
+        self.other_frame.columnconfigure(1, weight=1)
 
-        self.other_header = tkinter.Label(other_frame, text="Other", anchor="w", padx=12, pady=2, bg=self.colors["muted"], fg=self.colors["ink"], font=(self.main_font, 12, "bold"))
+        self.other_header = tkinter.Label(self.other_frame, text="Other", anchor="w", padx=12, pady=2, bg=self.colors["muted"], fg=self.colors["ink"], font=(self.main_font, 12, "bold"))
         self.other_header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 12))
 
         fields = [
-            ("Reference #", self.reference),
-            ("Weight (lbs)", self.weight),
-            ("Other Emails to Notify", self.other_emails[0]),
-            ("", self.other_emails[1]),
-            ("", self.other_emails[2]),
+            ("Reference #", "reference", self.reference),
+            ("Weight (lbs)", "weight",  self.weight),
+            ("Other Emails to Notify", "other_email_1",  self.other_emails[0]),
+            ("", "other_email_2",  self.other_emails[1]),
+            ("", "other_email_3",  self.other_emails[2]),
         ]
 
         weight_validation = (self.root.register(self.validate_weight_entry), "%P")
-        for row, (field_name, field_value) in enumerate(fields):
-            ttk.Label(other_frame, style="Card.TLabel", text=field_name).grid(row=row + 1, column=0, sticky="w", padx=5, pady=3)
-            entry = ttk.Entry(other_frame, textvariable=field_value, width=36)
+
+        for row, (field_name, key, field_value) in enumerate(fields):
+            ttk.Label(self.other_frame, style="Card.TLabel", text=field_name).grid(row=row + 1, column=0, sticky="w", padx=5, pady=3)
+            entry = ttk.Entry(self.other_frame, textvariable=field_value, width=36)
+
+            self.widgets[key] = entry
+
             if field_name == "Weight (lbs)":
                 entry.configure(validate="key", validatecommand=weight_validation)
+
             entry.grid(row=row+1, column=1, sticky="ew", padx=5, pady=3)
 
-        address_frame = ttk.Frame(self.results_frame, padding=4, style="Card.TFrame")
-        address_frame.grid(row=0, column=1, sticky="nsew", padx=(7, 0))
-        address_frame.columnconfigure(1, weight=1)
+        self.address_frame = ttk.Frame(self.results_frame, padding=4, style="Card.TFrame")
+        self.address_frame.grid(row=0, column=1, sticky="nsew", padx=(7, 0))
+        self.address_frame.columnconfigure(1, weight=1)
 
-        self.address_header = tkinter.Label(address_frame, text="Address", anchor="w", padx=12, pady=2, bg=self.colors["muted"], fg=self.colors["ink"], font=(self.main_font, 12, "bold"))
+        self.address_header = tkinter.Label(self.address_frame, text="Address", anchor="w", padx=12, pady=2, bg=self.colors["muted"], fg=self.colors["ink"], font=(self.main_font, 12, "bold"))
         self.address_header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 12))
 
-        self.create_field_label(address_frame, "Street line 1", row=1, required=True, pady=4)
-        ttk.Entry(address_frame, textvariable=self.street_line_one, width=36).grid(row=1, column=1, sticky="ew", padx=5, pady=4)
+        self.create_field_label(self.address_frame, "Street line 1", row=1, required=True, pady=4)
+        self.widgets["street_line_one"] = ttk.Entry(self.address_frame, textvariable=self.street_line_one, width=36)
+        self.widgets["street_line_one"].grid(row=1, column=1, sticky="ew", padx=5, pady=4)
 
-        self.create_field_label(address_frame, "Street line 2", row=2, required=False, pady=4)
-        ttk.Entry(address_frame, textvariable=self.street_line_two, width=36).grid(row=2, column=1, sticky="ew", padx=5, pady=4)
+        self.create_field_label(self.address_frame, "Street line 2", row=2, required=False, pady=4)
+        self.widgets["street_line_two"] = ttk.Entry(self.address_frame, textvariable=self.street_line_two, width=36)
+        self.widgets["street_line_two"].grid(row=2, column=1, sticky="ew", padx=5, pady=4)
 
-        bottom_frame = ttk.Frame(address_frame, style="CardInterior.TFrame")
-        bottom_frame.grid(row=3, column=0, columnspan=2, sticky="ew", padx=5, pady=8)
-        bottom_frame.columnconfigure(0, weight=1, uniform="bottom")
-        bottom_frame.columnconfigure(1, weight=1, uniform="bottom")
+        self.bottom_frame = ttk.Frame(self.address_frame, style="CardInterior.TFrame")
+        self.bottom_frame.grid(row=3, column=0, columnspan=2, sticky="ew", padx=5, pady=8)
+        self.bottom_frame.columnconfigure(0, weight=1, uniform="bottom")
+        self.bottom_frame.columnconfigure(1, weight=1, uniform="bottom")
 
-        type_frame = ttk.Frame(bottom_frame, style="CardInterior.TFrame")
-        type_frame.grid(row=0, column=0)
+        self.type_frame = ttk.Frame(self.bottom_frame, style="AddressType.TFrame", padding=(8, 5))
+        self.type_frame.grid(row=0, column=0)
 
-        ttk.Label(type_frame, style="Card.TLabel", text="Residential").grid(row=0, column=0, sticky="w", pady=3)
-        ttk.Radiobutton(type_frame, style="Card.TRadiobutton", variable=self.address_is_commercial, value=0).grid(row=0, column=1, sticky="w", padx=8)
+#        self.create_field_label(self.type_frame, "Classification", row=0, required=True)
+        ttk.Label(self.type_frame, style="Card.TLabel", text="Residential").grid(row=1, column=0, sticky="w", pady=3)
+        self.residential_radiobutton = ttk.Radiobutton(self.type_frame, style="Card.TRadiobutton", variable=self.address_is_commercial, value=0)
+        self.residential_radiobutton.grid(row=1, column=1, sticky="w", padx=8)
 
-        ttk.Label(type_frame, style="Card.TLabel", text="Commercial").grid(row=1, column=0, sticky="w", pady=3)
-        ttk.Radiobutton(type_frame, style="Card.TRadiobutton", variable=self.address_is_commercial, value=1).grid(row=1, column=1, sticky="w", padx=8)
+        ttk.Label(self.type_frame, style="Card.TLabel", text="Commercial").grid(row=2, column=0, sticky="w", pady=3)
+        self.commercial_radiobutton = ttk.Radiobutton(self.type_frame, style="Card.TRadiobutton", variable=self.address_is_commercial, value=1)
+        self.commercial_radiobutton.grid(row=2, column=1, sticky="w", padx=8)
 
-        location_frame = ttk.Frame(bottom_frame, style="CardInterior.TFrame")
-        location_frame.grid(row=0, column=1, sticky="ew")
-        location_frame.columnconfigure(0, weight=1, uniform="location")
-        location_frame.columnconfigure(1, weight=1, uniform="location")
+        self.location_frame = ttk.Frame(self.bottom_frame, style="CardInterior.TFrame")
+        self.location_frame.grid(row=0, column=1, sticky="ew")
+        self.location_frame.columnconfigure(0, weight=1, uniform="location")
+        self.location_frame.columnconfigure(1, weight=1, uniform="location")
 
-        self.create_field_label(location_frame, "City", row=0, required=True, padx=0, pady=0)
-        ttk.Entry(location_frame, textvariable=self.city).grid(row=1, column=0, columnspan=2, sticky="ew", pady=(2,10))
+        self.create_field_label(self.location_frame, "City", row=0, required=True, padx=0, pady=0)
+        self.widgets["city"] = ttk.Entry(self.location_frame, textvariable=self.city)
+        self.widgets["city"].grid(row=1, column=0, columnspan=2, sticky="ew", pady=(2, 10))
 
-        self.create_field_label(location_frame, "State", row=2, column=0, required=True, padx=0, pady=0)
-        ttk.Combobox(location_frame, textvariable=self.state_code, values=state_codes, state="readonly", width=6).grid(row=3, column=0, sticky="ew", padx=(0, 5), pady=2)
+        self.create_field_label(self.location_frame, "State", row=2, column=0, required=True, padx=0, pady=0)
+        self.widgets["state_code"] = ttk.Combobox(self.location_frame, textvariable=self.state_code, values=state_codes, state="readonly", width=6)
+        self.widgets["state_code"].grid(row=3, column=0, sticky="ew", padx=(0, 5), pady=2)
 
-        self.create_field_label(location_frame, "ZIP", row=2, column=1, required=True, padx=(5, 0), pady=0)
         zip_validation = (self.root.register(self.validate_zip_entry), "%P")
-        ttk.Entry(location_frame, textvariable=self.postal_code, width=10, validate="key", validatecommand=zip_validation).grid(row=3, column=1, sticky="ew", padx=(5, 0), pady=2)
+        self.create_field_label(self.location_frame, "ZIP", row=2, column=1, required=True, padx=(5, 0), pady=0)
+        self.widgets["postal_code"] = ttk.Entry(self.location_frame, textvariable=self.postal_code, width=10, validate="key", validatecommand=zip_validation)
+        self.widgets["postal_code"].grid(row=3, column=1, sticky="ew", padx=(5, 0), pady=2)
 
-        address_frame.rowconfigure(4, weight=1)
+        self.address_frame.rowconfigure(4, weight=1)
 
-        self.suggestion_panel = ttk.Frame(address_frame, style="SuggestionCard.TFrame", padding=(8, 6))
+        self.suggestion_panel = ttk.Frame(self.address_frame, style="SuggestionCard.TFrame", padding=(8, 6))
         self.suggestion_panel.grid(row=5, column=0, columnspan=2, sticky="ew", padx=5, pady=(0, 2))
         self.suggestion_panel.columnconfigure(0, weight=1)
 
@@ -321,10 +332,8 @@ class GUI:
         pin_image = pin_image.resize((18, 18), Image.Resampling.LANCZOS)
         self.pin_icon = ImageTk.PhotoImage(pin_image)
 
-        self.suggest_address_button = ttk.Button(self.suggestion_request_view, text="Validate Address", image=self.pin_icon, compound="left", style="SuggestAction.TButton", command=self.suggest_address)
+        self.suggest_address_button = ttk.Button(self.suggestion_request_view, text="Suggest Address?", image=self.pin_icon, compound="left", style="SuggestAction.TButton", command=self.suggest_address)
         self.suggest_address_button.grid(row=0, column=0)
-
-#        ttk.Label(self.suggestion_request_view, text="Choose an address version to enable rates", style="SuggestionNote.TLabel").grid(row=1, column=0, pady=(2, 0))
 
         # View 2
         self.suggestion_result_view = ttk.Frame(self.suggestion_panel, style="SuggestionBody.TFrame")
@@ -337,7 +346,7 @@ class GUI:
         self.suggested_address_entry = ttk.Entry(self.suggestion_result_view, textvariable=self.suggested_address_display, state="readonly", style="Suggestion.TEntry", takefocus=False)
         self.suggested_address_entry.grid(row=1, column=0, sticky="ew")
 
-        self.no_suggestion_label = ttk.Label(self.suggestion_result_view, text="FedEx could not confirm a suggested address.", style="SuggestionNote.TLabel", padding=(6, 5))
+        self.no_suggestion_label = ttk.Label(self.suggestion_result_view, text="FedEx could not find an address.", style="SuggestionNote.TLabel", padding=(6, 5))
         self.no_suggestion_label.grid(row=1, column=0, sticky="ew")
 
         choice_frame = ttk.Frame(self.suggestion_result_view, style="SuggestionBody.TFrame")
@@ -349,6 +358,25 @@ class GUI:
         self.use_entered_button = ttk.Button(choice_frame, text="Use Address As Entered", style="Compact.TButton", state="disabled", command=self.use_address_as_entered)
         self.use_entered_button.pack(side="left", padx=(5, 0))
 
+        # View 3
+        self.suggestion_approve_view = ttk.Frame(self.suggestion_panel, style="SuggestionBody.TFrame")
+        self.suggestion_approve_view.grid(row=0, column=0, sticky="nsew")
+        self.suggestion_approve_view.columnconfigure(0, weight=1)
+        self.suggestion_approve_view.rowconfigure(0, weight=1)
+
+        check_image = Image.open(Path(__file__).parent / "circle-check.png").convert("RGBA")
+        check_image = check_image.resize((24, 24), Image.Resampling.LANCZOS)
+        alpha = check_image.getchannel("A")
+
+        check_image= Image.new("RGBA", check_image.size, self.colors["success"])
+        check_image.putalpha(alpha)
+
+        self.check_icon = ImageTk.PhotoImage(check_image)
+
+        self.check_label = ttk.Label(self.suggestion_approve_view, image=self.check_icon, style="SuggestionCheck.TLabel")
+        self.check_label.grid(row=0, column=0)
+
+        # Set initial view
         self.suggestion_request_view.tkraise()
 
 
@@ -356,6 +384,7 @@ class GUI:
         if self._updating_address:
             return
 
+        self.clear_errors()
         self.show_suggestion_request_view()
 
 
@@ -419,9 +448,6 @@ class GUI:
 
         self.use_suggested_button.configure(state="disabled", style="Compact.TButton")
         self.use_entered_button.configure(state="disabled", style="Compact.TButton")
-
-        self.retrieve_rates_button.configure(state="disabled")
-        self.retrieve_rates_hint.configure(text="Select address", image=self.lock_icon, style="ActionHint.TLabel")
 
         self.suggested_address_display.set("")
         self.suggestion_request_view.tkraise()
@@ -506,6 +532,7 @@ class GUI:
         self.sync_preshipment_details_from_gui_to_processor()
 
         results = self.processor.is_preshipment_valid()
+        self.highlight_errors(results)
 
         if all(results.values()):
             rates = self.processor.retrieve_rates()
@@ -513,12 +540,26 @@ class GUI:
 #            self.display_rates(rates)
 #            self.lock_preshipment_widgets()
 #            self.switch_to_create_label_buttons()
-        else:
-            self.highlight_errors(results)
+
+
+    def clear_errors(self):
+        for key, widget in self.widgets.items():
+            widget.state(["!invalid"])
+
+        self.type_frame.configure(style="AddressType.TFrame")
 
 
     def highlight_errors(self, results: dict) -> None:
-        return
+        for key, widget in self.widgets.items():
+            if results.get(key, True):
+                widget.state(["!invalid"])
+            else:
+                widget.state(["invalid"])
+
+        if results.get("address_type", True):
+            self.type_frame.configure(style="AddressType.TFrame")
+        else:
+            self.type_frame.configure(style="InvalidAddressType.TFrame")
 
 
     def suggest_address(self):
@@ -545,13 +586,6 @@ class GUI:
         self.suggested_address_display.set(text)
 
 
-    def indicate_address_choice(self, choice: str):
-        self.use_suggested_button.configure(style="CompactSelected.TButton" if choice == "suggested" else "Compact.TButton")
-        self.use_entered_button.configure(style="CompactSelected.TButton" if choice == "entered" else "Compact.TButton")
-        self.retrieve_rates_button.configure(state="normal")
-        self.retrieve_rates_hint.configure(text="Address selected", image=self.check_icon, compound="left", style="ActionHintSuccess.TLabel")
-
-
     def use_suggested_address(self):
         self.processor.suggested_address_to_preshipment_address()
 
@@ -559,11 +593,11 @@ class GUI:
         self.sync_preshipment_details_from_processor_to_gui()
         self._updating_address = False
 
-        self.indicate_address_choice("suggested")
+        self.suggestion_approve_view.tkraise()
 
 
     def use_address_as_entered(self):
-        self.indicate_address_choice("entered")
+        self.suggestion_approve_view.tkraise()
 
 
     def run(self):

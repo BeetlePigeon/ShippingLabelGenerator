@@ -113,7 +113,7 @@ def build_fedex_ship_payload(shipment, account_number):
             "emailNotificationDetail": {
                 "aggregationType": "PER_SHIPMENT",
                 "emailNotificationRecipients": email_notifications_schema_list,
-                "personalMessage": "You have a FedEx package on the way Mr. Marnoshk Michaels!"
+                "personalMessage": "You have a FedEx package on the way!"
             },
             "labelSpecification": {"labelStockType": "PAPER_4X6", "imageType": "PDF", "labelFormatType": "COMMON2D"},
             "requestedPackageLineItems": [
