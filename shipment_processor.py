@@ -106,7 +106,7 @@ class Processor:
         address_classification = -1
 
         reference = "no_reference"
-        weight = "8"
+        weight = DEFAULT_SHIPMENT_WEIGHT
         other_emails = self.parser.parse_others_to_notify(rp_dict)
 
         self.preshipment_details["recipient_name"] = name
@@ -144,8 +144,8 @@ class Processor:
             "street_line_one": self.required_text_is_valid(self.preshipment_details["street_line_one"]),
             "street_line_two": True,
             "city": self.required_text_is_valid(self.preshipment_details["city"]),
-            "state_code": self.state_is_valid(self.preshipment_details["state_code"]),
-            "postal_code": self.required_text_is_valid(self.preshipment_details["postal_code"]),
+            "state_code": self.state_code_is_valid(self.preshipment_details["state_code"]),
+            "postal_code": self.postal_code_is_valid(self.preshipment_details["postal_code"]),
             "address_type": self.preshipment_details["address_is_commercial"] in (0, 1),
         }
 
@@ -366,5 +366,19 @@ class Processor:
 
 
     @staticmethod
-    def state_is_valid(selection) -> bool:
+    def state_code_is_valid(selection: str) -> bool:
         return selection in state_codes
+
+
+    @staticmethod
+    def postal_code_is_valid(text: str) -> bool:
+        if not text:
+            return True
+
+        if len(text) in (5, 9) and all(char in "0123456789" for char in text):
+            return True
+
+        if len(text) == 10 and all(char in "0123456789-" for char in text) and text.count("-") == 1 and text[5] == "-":
+            return True
+
+        return False
