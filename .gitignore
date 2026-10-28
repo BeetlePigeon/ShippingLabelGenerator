@@ -4,4 +4,4 @@ output_labels/
 __pycache__/
 .venv/
 playwright_profile/
-company_icon.png
+my_company_icon.png

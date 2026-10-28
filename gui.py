@@ -20,11 +20,7 @@ class GUI:
 
         assets_dir = Path(__file__).parent
 
-        company_icon = Image.open(assets_dir / "company_icon.png")
-        company_icon = company_icon.convert("RGBA")
-        company_icon.thumbnail((64, 64), Image.Resampling.LANCZOS)
-
-        self.company_icon = ImageTk.PhotoImage(company_icon)
+        self.company_icon = self.create_company_icon(assets_dir)
         self.root.iconphoto(True, self.company_icon)
 
         self.configure_styles()
@@ -128,6 +124,23 @@ class GUI:
         self.retrieve_rates_button.pack(side="left", padx=7)
 
 
+    @staticmethod
+    def create_company_icon(assets_dir):
+        placeholder_company_icon_path = assets_dir / "placeholder_company_icon.png"
+        custom_company_icon_path = assets_dir / "my_company_icon.png"
+
+        if custom_company_icon_path.is_file():
+            company_icon = Image.open(custom_company_icon_path)
+        else:
+            company_icon = Image.open(placeholder_company_icon_path)
+
+        company_icon = company_icon.convert("RGBA")
+        company_icon.thumbnail((64, 64), Image.Resampling.LANCZOS)
+        company_icon = ImageTk.PhotoImage(company_icon)
+
+        return company_icon
+
+
     def configure_styles(self):
         self.colors = {
             "bg": "#eff3f9",
@@ -204,11 +217,12 @@ class GUI:
 
 
     @staticmethod
-    def create_field_label(parent, text, row, column=0, required=False, padx=5, pady=3):
+    def create_field_label(parent, text, row, column=0, required=False, padx=5, pady=3, sticky="w"):
         label_frame = ttk.Frame(parent, style="CardInterior.TFrame")
-        label_frame.grid(row=row, column=column, sticky="w", padx=padx, pady=pady)
+        label_frame.grid(row=row, column=column, sticky=sticky, padx=padx, pady=pady)
 
         ttk.Label(label_frame, text=text, style="Card.TLabel").pack(side="left")
+
         if required:
             ttk.Label(label_frame, text=" *", style="Required.TLabel").pack(side="left")
 
@@ -286,17 +300,23 @@ class GUI:
         self.bottom_frame.columnconfigure(0, weight=1, uniform="bottom")
         self.bottom_frame.columnconfigure(1, weight=1, uniform="bottom")
 
-        self.type_frame = ttk.Frame(self.bottom_frame, style="AddressType.TFrame", padding=(8, 5))
-        self.type_frame.grid(row=0, column=0)
+        self.type_frame = ttk.Frame(self.bottom_frame, style="AddressType.TFrame", padding=(8, 0))
+        self.type_frame.grid(row=0, column=0, sticky="nsew")
+        self.type_frame.columnconfigure(0, weight=1)
+        self.type_frame.rowconfigure(1, weight=1)
 
-#        self.create_field_label(self.type_frame, "Classification", row=0, required=True)
-        ttk.Label(self.type_frame, style="Card.TLabel", text="Residential").grid(row=1, column=0, sticky="w", pady=3)
-        self.residential_radiobutton = ttk.Radiobutton(self.type_frame, style="Card.TRadiobutton", variable=self.address_is_commercial, value=0)
-        self.residential_radiobutton.grid(row=1, column=1, sticky="w", padx=8)
+        self.create_field_label(self.type_frame, "Classification", row=0, required=True, padx=0, pady=(3, 0), sticky="nw")
 
-        ttk.Label(self.type_frame, style="Card.TLabel", text="Commercial").grid(row=2, column=0, sticky="w", pady=3)
-        self.commercial_radiobutton = ttk.Radiobutton(self.type_frame, style="Card.TRadiobutton", variable=self.address_is_commercial, value=1)
-        self.commercial_radiobutton.grid(row=2, column=1, sticky="w", padx=8)
+        radio_frame = ttk.Frame(self.type_frame, style="CardInterior.TFrame")
+        radio_frame.grid(row=1, column=0)
+
+        ttk.Label(radio_frame, text="Residential", style="Card.TLabel").grid(row=0, column=0, sticky="w", pady=3)
+        self.residential_radiobutton = ttk.Radiobutton(radio_frame, style="Card.TRadiobutton", variable=self.address_is_commercial, value=0)
+        self.residential_radiobutton.grid(row=0, column=1, padx=8)
+
+        ttk.Label(radio_frame, text="Commercial", style="Card.TLabel").grid(row=1, column=0, sticky="w", pady=3)
+        self.commercial_radiobutton = ttk.Radiobutton(radio_frame, style="Card.TRadiobutton", variable=self.address_is_commercial, value=1)
+        self.commercial_radiobutton.grid(row=1, column=1, padx=8)
 
         self.location_frame = ttk.Frame(self.bottom_frame, style="CardInterior.TFrame")
         self.location_frame.grid(row=0, column=1, sticky="ew")
