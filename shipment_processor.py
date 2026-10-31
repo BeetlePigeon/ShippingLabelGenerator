@@ -94,7 +94,7 @@ class Processor:
         if not self.scraper.session_is_authenticated(url):
             self.scraper.authenticate_session(url)
 
-        if not self.scraper.request_is_valid(url):
+        if not self.scraper.request_number_is_valid(url):
             return False
 
         rp_dict = self.scraper.scrape_request(url).model_dump()
