@@ -39,6 +39,7 @@ class RequestPortalData(BaseModel):
     comments: str = ""
     new_hire_name: str = ""
     new_hire_date: str = ""
+    contractor_name: str = ""
     facility: str = ""
     office: str = ""
     address: str = ""

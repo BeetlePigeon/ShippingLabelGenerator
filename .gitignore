@@ -5,3 +5,4 @@ __pycache__/
 .venv/
 playwright_profile/
 my_company_icon.png
+test_inputs.py

@@ -32,8 +32,8 @@ class Parser:
 
 
     @staticmethod
-    def get_label_name_from(name_string: str, new_hire: bool=False) -> str:
-        if new_hire:
+    def get_label_name_from(name_string: str, normalized: bool=True) -> str:
+        if not normalized:
             if "," in name_string:
                 parts = re.split(", ", name_string)
                 second_part, first_part = parts[0], parts[1]
@@ -63,9 +63,10 @@ class Parser:
         requester = data["request_by"]
         requestee = data["request_for"]
         new_hire = data["new_hire_name"]
+        contractor = data["contractor_name"]
 
-        if new_hire:
-            label_name = self.get_label_name_from(new_hire, new_hire=True)
+        if new_hire or contractor:
+            label_name = self.get_label_name_from(new_hire or contractor, normalized=False)
             email_address = self.get_email_address_from(requester)
         elif requester != requestee:
             label_name = self.get_label_name_from(requestee)

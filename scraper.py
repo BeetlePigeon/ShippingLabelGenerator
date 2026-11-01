@@ -101,6 +101,7 @@ class Scraper:
                     comments=self.get_field_value(page, "Comments:"),
                     new_hire_name=self.get_field_value(page, "New Hire Name:"),
                     new_hire_date=self.get_field_value(page, "New Hire Date:"),
+                    contractor_name=self.get_field_value(page, "Contractor Name:"),
                     facility=self.get_field_value(page, "Facility:"),
                     office=self.get_field_value(page, "Office:"),
                     address=self.get_field_value(page, "Address:"),
