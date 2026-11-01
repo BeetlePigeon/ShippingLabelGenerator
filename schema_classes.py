@@ -1,6 +1,7 @@
 from datetime import datetime
 from enum import StrEnum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+from typing import ClassVar
 
 
 class ServiceType(StrEnum):
@@ -19,14 +20,31 @@ class RatesOption(BaseModel):
     service_type: ServiceType
     estimated_delivery_time: datetime
     estimated_delivery_cost: float
+    table_strings: ClassVar[dict[ServiceType, str]] = {
+        ServiceType.FIRST_OVERNIGHT: "FedEx First Overnight®",
+        ServiceType.PRIORITY_OVERNIGHT: "FedEx Priority Overnight®",
+        ServiceType.STANDARD_OVERNIGHT: "FedEx Standard Overnight®",
+        ServiceType.FEDEX_2_DAY_AM: "FedEx 2Day® AM",
+        ServiceType.FEDEX_2_DAY: "FedEx 2Day®",
+        ServiceType.FEDEX_EXPRESS_SAVER: "FedEx Express Saver®",
+        ServiceType.FEDEX_GROUND: "FedEx Ground Delivery®",
+        ServiceType.GROUND_HOME_DELIVERY: "FedEx Home Delivery®",
+    }
+
+
+    @property
+    def table_string(self) -> str:
+        return self.table_strings[self.service_type]
 
 
 class RatesOptions(BaseModel):
     options: list[RatesOption]
 
+
     @property
     def fastest(self) -> RatesOption:
         return min(self.options, key=lambda option: option.estimated_delivery_time)
+
 
     @property
     def cheapest(self) -> RatesOption:

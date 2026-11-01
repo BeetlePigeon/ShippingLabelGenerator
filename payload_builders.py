@@ -103,7 +103,7 @@ def build_fedex_ship_payload(shipment, account_number):
                 }
             ],
             "pickupType": "DROPOFF_AT_FEDEX_LOCATION",
-            "serviceType": shipment.service_type,
+            "serviceType": shipment.selected_service_type,
             "packagingType": "YOUR_PACKAGING",
             "totalWeight": float(shipment.weight),
             "shippingChargesPayment": {"paymentType": "SENDER"},

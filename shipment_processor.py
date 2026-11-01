@@ -1,10 +1,13 @@
 import json
 import re
+import base64
+from datetime import date
+from pathlib import Path
 from scraper import Scraper
 from parser import Parser
 from tables import state_codes
-from config import APIEnvironment, rates_API_config, validation_API_config, DEFAULT_SHIPMENT_WEIGHT
-from api_requests import request_access_token, request_suggested_address, request_rates_options
+from config import APIEnvironment, ship_API_config, rates_API_config, validation_API_config, DEFAULT_SHIPMENT_WEIGHT
+from api_requests import request_access_token, request_suggested_address, request_rates_options, request_shipping_label
 from schema_classes import Address, Shipment
 from private import (
     sandbox_api_key,
@@ -64,6 +67,70 @@ class Processor:
             "postal_code": "",
             "address_is_commercial": -1,
         }
+
+        self.rates = None
+
+
+    @staticmethod
+    def pretty_print(response):
+        pretty_json = json.dumps(response, indent=4)
+        print(pretty_json)
+
+
+    @staticmethod
+    def required_text_is_valid(text: str) -> bool:
+        return bool(text)
+
+
+    @staticmethod
+    def name_is_valid(text: str) -> bool:
+        return bool(text)
+
+
+    @staticmethod
+    def email_is_valid(text: str) -> bool:
+        email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+        if not text or re.fullmatch(email_regex, text):
+            return True
+        return False
+
+
+    @staticmethod
+    def phone_is_valid(text: str) -> bool:
+        cleaned = re.sub(r'\D', '', text)
+        return not text or len(cleaned) == 10 or (len(cleaned) == 11 and cleaned.startswith("1"))
+
+
+    @staticmethod
+    def reference_is_valid(text: str) -> bool:
+        return not text or len(text) <= 24
+
+
+    @staticmethod
+    def weight_is_valid(weight: str) -> bool:
+        return (not weight or
+                any(char.isdigit() for char in weight)
+                and 0 < float(weight) <= 20
+        )
+
+
+    @staticmethod
+    def state_code_is_valid(selection: str) -> bool:
+        return selection in state_codes
+
+
+    @staticmethod
+    def postal_code_is_valid(text: str) -> bool:
+        if not text:
+            return True
+
+        if len(text) in (5, 9) and all(char in "0123456789" for char in text):
+            return True
+
+        if len(text) == 10 and all(char in "0123456789-" for char in text) and text.count("-") == 1 and text[5] == "-":
+            return True
+
+        return False
 
 
     def clear_preshipment_details(self):
@@ -152,102 +219,6 @@ class Processor:
         return results
 
 
-    def build_preshipment_data(self):
-        shipper_address = Address(
-            street_line_one=shipper_street_line_one,
-            street_line_two=shipper_street_line_two,
-            city=shipper_city,
-            state_code=shipper_state_code,
-            postal_code=shipper_postal_code,
-            country_code=shipper_country_code,
-        )
-
-        recipient_address = Address(
-            street_line_one=self.preshipment_details["street_line_one"],
-            street_line_two=self.preshipment_details["street_line_two"],
-            city=self.preshipment_details["city"],
-            state_code=self.preshipment_details["state_code"],
-            postal_code=self.preshipment_details["postal_code"],
-            country_code="US",
-        )
-
-        return Shipment(
-            company_name=company_name,
-            charge_code=charge_code,
-            account_number=shipper_account_number,
-
-            shipper_address=shipper_address,
-            shipper_name=shipper_name,
-            shipper_email_address=shipper_email_address,
-            shipper_phone_number=shipper_phone_number,
-            shipper_address_is_commercial=shipper_address_is_commercial,
-
-            recipient_address=recipient_address,
-            recipient_name=self.preshipment_details["recipient_name"],
-            recipient_email_address=self.preshipment_details["recipient_email"],
-            recipient_phone_number=self.preshipment_details["recipient_phone"],
-            recipient_address_is_commercial=bool(self.preshipment_details["address_is_commercial"]),
-
-            reference=self.preshipment_details["reference"],
-            weight=self.preshipment_details["weight"] or DEFAULT_SHIPMENT_WEIGHT,
-            other_email_1=self.preshipment_details["other_email_1"],
-            other_email_2=self.preshipment_details["other_email_2"],
-            other_email_3=self.preshipment_details["other_email_3"],
-
-            selected_service_type=None,
-        )
-
-
-    def retrieve_rates(self):
-        preshipment_data = self.build_preshipment_data()
-        rates = request_rates_options(self.sandbox_token, self.production_token, preshipment_data, rates_API_config)
-        return rates
-
-
-    def suggested_address_to_preshipment_address(self):
-        self.preshipment_details["street_line_one"] = self.suggested_address["street_line_one"]
-        self.preshipment_details["street_line_two"] = self.suggested_address["street_line_two"]
-        self.preshipment_details["city"] = self.suggested_address["city"]
-        self.preshipment_details["state_code"] = self.suggested_address["state_code"]
-        self.preshipment_details["postal_code"] = self.suggested_address["postal_code"]
-        self.preshipment_details["address_is_commercial"] = self.suggested_address["address_is_commercial"]
-
-
-    def set_suggested_address(self, address, is_commercial):
-        self.suggested_address["street_line_one"] = address.street_line_one
-        self.suggested_address["street_line_two"] = address.street_line_two
-        self.suggested_address["city"] = address.city
-        self.suggested_address["state_code"] = address.state_code
-        self.suggested_address["postal_code"] = address.postal_code
-        self.suggested_address["address_is_commercial"] = is_commercial
-
-
-    def get_suggested_address(self):
-        address = self.build_address_obj(
-                self.preshipment_details["street_line_one"],
-                self.preshipment_details["street_line_two"],
-                self.preshipment_details["city"],
-                self.preshipment_details["state_code"],
-                self.preshipment_details["postal_code"],
-            )
-
-        data = request_suggested_address(self.sandbox_token, self.production_token, address, validation_API_config).json()
-
-        resolved_addresses = data.get("output", {}).get("resolvedAddresses") or []
-
-        if not resolved_addresses:
-            raise ValueError("FedEx returned no resolved addresses.")
-
-        resolved_address = resolved_addresses[0]
-
-        self.pretty_print(resolved_address)
-        confirmed_address = self.address_is_confirmed(resolved_address)
-        suggested_address = self.address_from_response(resolved_address)
-        address_classification = self.classification_from_response(resolved_address)
-
-        return confirmed_address, suggested_address, address_classification
-
-
     def address_from_response(self, response):
         street_lines = response.get("streetLinesToken")
         if street_lines:
@@ -322,63 +293,120 @@ class Processor:
             return None
 
 
-    @staticmethod
-    def pretty_print(response):
-        pretty_json = json.dumps(response, indent=4)
-        print(pretty_json)
+    def build_preshipment_data(self, selected_service_type=None):
+        shipper_address = Address(
+            street_line_one=shipper_street_line_one,
+            street_line_two=shipper_street_line_two,
+            city=shipper_city,
+            state_code=shipper_state_code,
+            postal_code=shipper_postal_code,
+            country_code=shipper_country_code,
+        )
 
+        recipient_address = Address(
+            street_line_one=self.preshipment_details["street_line_one"],
+            street_line_two=self.preshipment_details["street_line_two"],
+            city=self.preshipment_details["city"],
+            state_code=self.preshipment_details["state_code"],
+            postal_code=self.preshipment_details["postal_code"],
+            country_code="US",
+        )
 
-    @staticmethod
-    def required_text_is_valid(text: str) -> bool:
-        return bool(text)
+        return Shipment(
+            company_name=company_name,
+            charge_code=charge_code,
+            account_number=shipper_account_number,
 
+            shipper_address=shipper_address,
+            shipper_name=shipper_name,
+            shipper_email_address=shipper_email_address,
+            shipper_phone_number=shipper_phone_number,
+            shipper_address_is_commercial=shipper_address_is_commercial,
 
-    @staticmethod
-    def name_is_valid(text: str) -> bool:
-        return bool(text)
+            recipient_address=recipient_address,
+            recipient_name=self.preshipment_details["recipient_name"],
+            recipient_email_address=self.preshipment_details["recipient_email"],
+            recipient_phone_number=self.preshipment_details["recipient_phone"],
+            recipient_address_is_commercial=bool(self.preshipment_details["address_is_commercial"]),
 
+            reference=self.preshipment_details["reference"],
+            weight=self.preshipment_details["weight"] or DEFAULT_SHIPMENT_WEIGHT,
+            other_email_1=self.preshipment_details["other_email_1"],
+            other_email_2=self.preshipment_details["other_email_2"],
+            other_email_3=self.preshipment_details["other_email_3"],
 
-    @staticmethod
-    def email_is_valid(text: str) -> bool:
-        email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-        if not text or re.fullmatch(email_regex, text):
-            return True
-        return False
-
-
-    @staticmethod
-    def phone_is_valid(text: str) -> bool:
-        cleaned = re.sub(r'\D', '', text)
-        return not text or len(cleaned) == 10 or (len(cleaned) == 11 and cleaned.startswith("1"))
-
-
-    @staticmethod
-    def reference_is_valid(text: str) -> bool:
-        return not text or len(text) <= 24
-
-
-    @staticmethod
-    def weight_is_valid(weight: str) -> bool:
-        return (not weight or
-                any(char.isdigit() for char in weight)
-                and 0 < float(weight) <= 20
+            selected_service_type=selected_service_type,
         )
 
 
-    @staticmethod
-    def state_code_is_valid(selection: str) -> bool:
-        return selection in state_codes
+    def build_final_shipment_data(self, service_type):
+        return self.build_preshipment_data(selected_service_type=service_type)
 
 
-    @staticmethod
-    def postal_code_is_valid(text: str) -> bool:
-        if not text:
-            return True
+    def suggested_address_to_preshipment_address(self):
+        self.preshipment_details["street_line_one"] = self.suggested_address["street_line_one"]
+        self.preshipment_details["street_line_two"] = self.suggested_address["street_line_two"]
+        self.preshipment_details["city"] = self.suggested_address["city"]
+        self.preshipment_details["state_code"] = self.suggested_address["state_code"]
+        self.preshipment_details["postal_code"] = self.suggested_address["postal_code"]
+        self.preshipment_details["address_is_commercial"] = self.suggested_address["address_is_commercial"]
 
-        if len(text) in (5, 9) and all(char in "0123456789" for char in text):
-            return True
 
-        if len(text) == 10 and all(char in "0123456789-" for char in text) and text.count("-") == 1 and text[5] == "-":
-            return True
+    def set_suggested_address(self, address, is_commercial):
+        self.suggested_address["street_line_one"] = address.street_line_one
+        self.suggested_address["street_line_two"] = address.street_line_two
+        self.suggested_address["city"] = address.city
+        self.suggested_address["state_code"] = address.state_code
+        self.suggested_address["postal_code"] = address.postal_code
+        self.suggested_address["address_is_commercial"] = is_commercial
 
-        return False
+
+    def get_suggested_address(self):
+        address = self.build_address_obj(
+                self.preshipment_details["street_line_one"],
+                self.preshipment_details["street_line_two"],
+                self.preshipment_details["city"],
+                self.preshipment_details["state_code"],
+                self.preshipment_details["postal_code"],
+            )
+
+        data = request_suggested_address(self.sandbox_token, self.production_token, address, validation_API_config).json()
+
+        resolved_addresses = data.get("output", {}).get("resolvedAddresses") or []
+
+        if not resolved_addresses:
+            raise ValueError("FedEx returned no resolved addresses.")
+
+        resolved_address = resolved_addresses[0]
+
+        confirmed_address = self.address_is_confirmed(resolved_address)
+        suggested_address = self.address_from_response(resolved_address)
+        address_classification = self.classification_from_response(resolved_address)
+
+        return confirmed_address, suggested_address, address_classification
+
+
+    def retrieve_rates(self):
+        preshipment_data = self.build_preshipment_data()
+        rates = request_rates_options(self.sandbox_token, self.production_token, preshipment_data, rates_API_config)
+        self.rates = rates
+
+
+    def clear_rates(self):
+        self.rates = None
+
+
+    def create_and_save_label(self, shipment_data):
+        label_data = request_shipping_label(self.sandbox_token, self.production_token, shipment_data, ship_API_config)
+        self.label_data_to_pdf(label_data)
+
+
+    def label_data_to_pdf(self, response_data):
+        tracking_number = response_data["output"]["transactionShipments"][0]["masterTrackingNumber"]
+        encoded_label = response_data["output"]["transactionShipments"][0]["pieceResponses"][0]["packageDocuments"][0][
+            "encodedLabel"]
+        label_bytes = base64.b64decode(encoded_label)
+        output_directory = Path(__file__).parent / "output_labels"
+        output_directory.mkdir(exist_ok=True)
+        label_path = output_directory / f"{self.preshipment_details["recipient_name"]}_{date.today()}_{tracking_number}.pdf"
+        label_path.write_bytes(label_bytes)

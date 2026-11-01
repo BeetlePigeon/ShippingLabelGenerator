@@ -548,40 +548,6 @@ class GUI:
         self.processor.preshipment_details.update(details)
 
 
-    def attempt_retrieve_rates(self):
-        self.sync_preshipment_details_from_gui_to_processor()
-
-        results = self.processor.is_preshipment_valid()
-        self.highlight_errors(results)
-
-        if all(results.values()):
-            rates = self.processor.retrieve_rates()
-            print(rates)
-#            self.display_rates(rates)
-#            self.lock_preshipment_widgets()
-#            self.switch_to_create_label_buttons()
-
-
-    def clear_errors(self):
-        for key, widget in self.widgets.items():
-            widget.state(["!invalid"])
-
-        self.type_frame.configure(style="AddressType.TFrame")
-
-
-    def highlight_errors(self, results: dict) -> None:
-        for key, widget in self.widgets.items():
-            if results.get(key, True):
-                widget.state(["!invalid"])
-            else:
-                widget.state(["invalid"])
-
-        if results.get("address_type", True):
-            self.type_frame.configure(style="AddressType.TFrame")
-        else:
-            self.type_frame.configure(style="InvalidAddressType.TFrame")
-
-
     def suggest_address(self):
         self.sync_preshipment_details_from_gui_to_processor()
         confirmed, address, is_commercial = self.processor.get_suggested_address()
@@ -618,6 +584,85 @@ class GUI:
 
     def use_address_as_entered(self):
         self.suggestion_approve_view.tkraise()
+
+
+    def highlight_errors(self, results: dict) -> None:
+        for key, widget in self.widgets.items():
+            if results.get(key, True):
+                widget.state(["!invalid"])
+            else:
+                widget.state(["invalid"])
+
+        if results.get("address_type", True):
+            self.type_frame.configure(style="AddressType.TFrame")
+        else:
+            self.type_frame.configure(style="InvalidAddressType.TFrame")
+
+
+    def clear_errors(self):
+        for key, widget in self.widgets.items():
+            widget.state(["!invalid"])
+
+        self.type_frame.configure(style="AddressType.TFrame")
+
+
+    def attempt_retrieve_rates(self):
+        self.sync_preshipment_details_from_gui_to_processor()
+
+        results = self.processor.is_preshipment_valid()
+        self.highlight_errors(results)
+
+        if all(results.values()):
+            self.processor.retrieve_rates()
+            self.display_rates()
+
+
+    def display_rates(self):
+        rates_window = tkinter.Toplevel(self.root)
+        rates_window.title("Available Shipping Rates")
+        rates_window.geometry("650x400")
+
+        columns = ("service_type", "estimated_delivery_time", "estimated_delivery_cost")
+
+        self.rates_table = ttk.Treeview(rates_window, columns=columns, show="headings", selectmode="browse")
+        self.rates_table.pack(fill="both")
+
+        self.rates_table.bind("<<TreeviewSelect>>", self.update_finalize_button)
+
+        self.rates_table.heading("service_type", text="Service")
+        self.rates_table.heading("estimated_delivery_time", text="Est. Delivery")
+        self.rates_table.heading("estimated_delivery_cost", text="Estimated Cost")
+
+        for id, rate in enumerate(self.processor.rates.options):
+            service_type = rate.table_string
+            est_delivery = rate.estimated_delivery_time
+            est_cost = f"${rate.estimated_delivery_cost:.2f}"
+
+            self.rates_table.insert("", tkinter.END, values=(service_type, est_delivery, est_cost), iid=id)
+
+        self.edit_shipment_button = ttk.Button(rates_window, text="Edit Details", command=self.return_to_preshipment_details)
+        self.edit_shipment_button.pack()
+
+        self.finalize_shipment_button = ttk.Button(rates_window, text="Finalize Shipment", style="Primary.TButton", command=self.finalize_shipment, state="disabled")
+        self.finalize_shipment_button.pack()
+
+
+    def update_finalize_button(self, event=None):
+        if self.rates_table.selection():
+            self.finalize_shipment_button.configure(state="normal")
+        else:
+            self.finalize_shipment_button.configure(state="disabled")
+
+
+    def return_to_preshipment_details(self):
+        self.processor.clear_rates()
+
+
+    def finalize_shipment(self):
+        selected_rate_id = self.rates_table.selection()[0]
+        selected_rate_option = self.processor.rates.options[int(selected_rate_id)]
+        final_shipment_data = self.processor.build_final_shipment_data(selected_rate_option.service_type)
+        self.processor.create_and_save_label(final_shipment_data)
 
 
     def run(self):
