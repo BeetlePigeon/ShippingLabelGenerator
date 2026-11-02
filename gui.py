@@ -145,6 +145,7 @@ class GUI:
         self.colors = {
             "bg": "#eff3f9",
             "surface": "#ffffff",
+            "sky": "#e5eaf0",
             "muted": "#e9eff7",
             "border": "#ccd8e6",
             "ink": "#263449",
@@ -457,7 +458,7 @@ class GUI:
         request_number = self.extract_rp_number(pasted_text)
 
         if request_number is not None:
-            self.rp_number_entry.delete(0, tkinter.END)
+            self.rp_number_entry.delete(0, "end")
             self.rp_number_entry.insert(0, request_number)
             self.rp_error_label.configure(text="")
             return "break"
@@ -625,20 +626,32 @@ class GUI:
         columns = ("service_type", "estimated_delivery_time", "estimated_delivery_cost")
 
         self.rates_table = ttk.Treeview(rates_window, columns=columns, show="headings", selectmode="browse")
-        self.rates_table.pack(fill="both")
+        self.rates_table.pack(fill="both", expand=True)
 
         self.rates_table.bind("<<TreeviewSelect>>", self.update_finalize_button)
+        self.rates_table.bind("<Button-1>", self.on_table_click)
+        self.rates_table.bind("<Up>", self.navigate_rates)
+        self.rates_table.bind("<Down>", self.navigate_rates)
+        self.rates_table.bind("<Return>", self.finalize_shipment)
+        self.rates_table.bind("<space>", self.finalize_shipment)
 
         self.rates_table.heading("service_type", text="Service")
         self.rates_table.heading("estimated_delivery_time", text="Est. Delivery")
         self.rates_table.heading("estimated_delivery_cost", text="Estimated Cost")
 
-        for id, rate in enumerate(self.processor.rates.options):
+        prev_date = None
+        for idx, rate in enumerate(self.processor.rates.options):
+            if prev_date != rate.estimated_delivery_time.date():
+                prev_date = rate.estimated_delivery_time.date()
+                self.rates_table.insert("", "end", iid=f"{prev_date}", tags=("date_header",))
+
             service_type = rate.table_string
-            est_delivery = rate.estimated_delivery_time
+            est_delivery = rate.estimated_delivery_time.strftime("%m-%d %I:%M %p")
             est_cost = f"${rate.estimated_delivery_cost:.2f}"
 
-            self.rates_table.insert("", tkinter.END, values=(service_type, est_delivery, est_cost), iid=id)
+            self.rates_table.insert("", "end", iid=idx, values=(service_type, est_delivery, est_cost))
+
+        self.rates_table.tag_configure("date_header", background=self.colors["sky"])
 
         self.edit_shipment_button = ttk.Button(rates_window, text="Edit Details", command=self.return_to_preshipment_details)
         self.edit_shipment_button.pack()
@@ -647,19 +660,64 @@ class GUI:
         self.finalize_shipment_button.pack()
 
 
-    def update_finalize_button(self, event=None):
-        if self.rates_table.selection():
-            self.finalize_shipment_button.configure(state="normal")
+    def on_table_click(self, event):
+        row_id = self.rates_table.identify_row(event.y)
+
+        if row_id and "date_header" in self.rates_table.item(row_id, "tags"):
+            return "break"
+
+
+    def navigate_rates(self, event):
+        current_row = self.rates_table.focus()
+        if not current_row:
+            current_row = "0"
+            self.rates_table.focus(current_row)
+            self.rates_table.selection_set(current_row)
+            return "break"
+
+        if event.keysym == "Up":
+            next_row = self.rates_table.prev(current_row)
+            if next_row and "date_header" in self.rates_table.item(next_row, "tags"):
+                next_row = self.rates_table.prev(next_row)
+            if not next_row:
+                next_row = "0"
         else:
-            self.finalize_shipment_button.configure(state="disabled")
+            next_row = self.rates_table.next(current_row)
+            if next_row and "date_header" in self.rates_table.item(next_row, "tags"):
+                next_row = self.rates_table.next(next_row)
+            if not next_row:
+                next_row = str(len(self.processor.rates.options) - 1)
+
+        self.rates_table.focus(next_row)
+        self.rates_table.selection_set(next_row)
+        return "break"
+
+
+    def update_finalize_button(self, event=None):
+        selection = self.rates_table.selection()
+
+        if selection:
+            selected_id = selection[0]
+
+            if "date_header" in self.rates_table.item(selected_id, "tags"):
+                self.rates_table.selection_remove(selected_id)
+
+        self.finalize_shipment_button.configure(
+            state="normal" if self.rates_table.selection() else "disabled"
+        )
 
 
     def return_to_preshipment_details(self):
         self.processor.clear_rates()
 
 
-    def finalize_shipment(self):
-        selected_rate_id = self.rates_table.selection()[0]
+    def finalize_shipment(self, event=None):
+        selection = self.rates_table.selection()
+        if selection:
+            selected_rate_id = self.rates_table.selection()[0]
+        else:
+            return
+
         selected_rate_option = self.processor.rates.options[int(selected_rate_id)]
         final_shipment_data = self.processor.build_final_shipment_data(selected_rate_option.service_type)
         self.processor.create_and_save_label(final_shipment_data)

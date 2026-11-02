@@ -408,5 +408,7 @@ class Processor:
         label_bytes = base64.b64decode(encoded_label)
         output_directory = Path(__file__).parent / "output_labels"
         output_directory.mkdir(exist_ok=True)
-        label_path = output_directory / f"{self.preshipment_details["recipient_name"]}_{date.today()}_{tracking_number}.pdf"
+        today = date.today()
+        today.strftime("%m_%d")
+        label_path = output_directory / f"{self.preshipment_details["recipient_name"]}-{today}-{tracking_number}.pdf"
         label_path.write_bytes(label_bytes)
