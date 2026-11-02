@@ -619,13 +619,24 @@ class GUI:
 
 
     def display_rates(self):
-        rates_window = tkinter.Toplevel(self.root)
-        rates_window.title("Available Shipping Rates")
-        rates_window.geometry("650x400")
+        self.rates_window = tkinter.Toplevel(self.root)
+        self.rates_window.title("Available Shipping Rates")
+
+        width, height = 650, 400
+
+        screen_width = self.rates_window.winfo_screenwidth()
+        screen_height = self.rates_window.winfo_screenheight()
+
+        x = (screen_width - width) // 2
+        y = (screen_height - height) // 2
+
+        self.rates_window.geometry(f"{width}x{height}+{x}+{y}")
+        self.rates_window.transient(self.root)
+        self.rates_window.resizable(False, False)
 
         columns = ("service_type", "estimated_delivery_time", "estimated_delivery_cost")
 
-        self.rates_table = ttk.Treeview(rates_window, columns=columns, show="headings", selectmode="browse")
+        self.rates_table = ttk.Treeview(self.rates_window, columns=columns, show="headings", selectmode="browse")
         self.rates_table.pack(fill="both", expand=True)
 
         self.rates_table.bind("<<TreeviewSelect>>", self.update_finalize_button)
@@ -653,11 +664,15 @@ class GUI:
 
         self.rates_table.tag_configure("date_header", background=self.colors["sky"])
 
-        self.edit_shipment_button = ttk.Button(rates_window, text="Edit Details", command=self.return_to_preshipment_details)
+        self.edit_shipment_button = ttk.Button(self.rates_window, text="Edit Details", command=self.return_to_preshipment_details)
         self.edit_shipment_button.pack()
 
-        self.finalize_shipment_button = ttk.Button(rates_window, text="Finalize Shipment", style="Primary.TButton", command=self.finalize_shipment, state="disabled")
+        self.finalize_shipment_button = ttk.Button(self.rates_window, text="Finalize Shipment", style="Primary.TButton", command=self.finalize_shipment, state="disabled")
         self.finalize_shipment_button.pack()
+
+        self.rates_window.wait_visibility()
+        self.rates_window.grab_set()
+        self.rates_table.focus_set()
 
 
     def on_table_click(self, event):
