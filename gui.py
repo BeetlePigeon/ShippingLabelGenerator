@@ -634,6 +634,8 @@ class GUI:
         self.rates_window.transient(self.root)
         self.rates_window.resizable(False, False)
 
+        self.rates_window.protocol("WM_DELETE_WINDOW", self.return_to_preshipment_details)
+
         columns = ("service_type", "estimated_delivery_time", "estimated_delivery_cost")
 
         self.rates_table = ttk.Treeview(self.rates_window, columns=columns, show="headings", selectmode="browse")
@@ -724,6 +726,7 @@ class GUI:
 
     def return_to_preshipment_details(self):
         self.processor.clear_rates()
+        self.rates_window.destroy()
 
 
     def finalize_shipment(self, event=None):
