@@ -386,6 +386,15 @@ class Processor:
         return confirmed_address, suggested_address, address_classification
 
 
+    def clear_suggested_address(self):
+        self.suggested_address["street_line_one"] = ""
+        self.suggested_address["street_line_two"] = ""
+        self.suggested_address["city"] = ""
+        self.suggested_address["state_code"] = ""
+        self.suggested_address["postal_code"] = ""
+        self.suggested_address["address_is_commercial"] = -1
+
+
     def retrieve_rates(self):
         preshipment_data = self.build_preshipment_data()
         rates = request_rates_options(self.sandbox_token, self.production_token, preshipment_data, rates_API_config)
@@ -397,15 +406,36 @@ class Processor:
 
 
     def create_and_save_label(self, shipment_data):
-        label_data = request_shipping_label(self.sandbox_token, self.production_token, shipment_data, ship_API_config)
-        self.label_data_to_pdf(label_data)
+        response_data = request_shipping_label(self.sandbox_token, self.production_token, shipment_data, ship_API_config)
+
+        errors = response_data.get("errors")
+        if errors:
+            return False
+
+        shipments = response_data.get("output", {}).get("transactionShipments", [])
+        if not shipments:
+            return False
+
+        tracking_number = shipments[0].get("masterTrackingNumber")
+        piece_responses = shipments[0].get("pieceResponses", [])
+        if not piece_responses:
+            return False
+
+        package_documents = piece_responses[0].get("packageDocuments", [])
+        if not package_documents:
+            return False
+
+        encoded_label = package_documents[0].get("encodedLabel")
+
+        if not encoded_label or not tracking_number:
+            return False
+
+        self.label_data_to_pdf(encoded_label, tracking_number)
+        return True
 
 
-    def label_data_to_pdf(self, response_data):
-        tracking_number = response_data["output"]["transactionShipments"][0]["masterTrackingNumber"]
-        encoded_label = response_data["output"]["transactionShipments"][0]["pieceResponses"][0]["packageDocuments"][0][
-            "encodedLabel"]
-        label_bytes = base64.b64decode(encoded_label)
+    def label_data_to_pdf(self, label_data, tracking_number):
+        label_bytes = base64.b64decode(label_data)
         output_directory = Path(__file__).parent / "output_labels"
         output_directory.mkdir(exist_ok=True)
         today = date.today()
