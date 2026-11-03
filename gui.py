@@ -123,6 +123,8 @@ class GUI:
         self.retrieve_rates_button = ttk.Button(action_frame, text="Retrieve Rates", style="Primary.TButton", state="normal", command=self.attempt_retrieve_rates)
         self.retrieve_rates_button.pack(side="left", padx=7)
 
+        self.root.protocol("WM_DELETE_WINDOW", self.exit_application)
+
 
     @staticmethod
     def create_company_icon(assets_dir):
@@ -183,8 +185,8 @@ class GUI:
         style.configure("Card.TLabel", background=c["surface"], foreground=c["ink"], font=(self.main_font, 10))
         style.configure("Hint.TLabel", background=c["surface"], foreground=c["subtitle"], font=(self.main_font, 9))
         style.configure("Error.TLabel", background=c["surface"], foreground=c["hover"], font=(self.main_font, 12))
+        style.configure("RatesSuccess.TLabel", foreground=c["success"], font=(self.main_font, 10))
         style.configure("RatesError.TLabel", foreground=c["hover"], font=(self.main_font, 10))
-        style.configure("RatesError.TLabel", foreground=c["success"], font=(self.main_font, 10))
         style.configure("AddressType.TFrame", background=c["surface"], bordercolor=c["surface"], borderwidth=1, relief="solid")
         style.configure("InvalidAddressType.TFrame", background=c["surface"], bordercolor=c["asterisk"], borderwidth=1, relief="solid")
         style.configure("ActionHint.TLabel", background=c["bg"], foreground=c["subtitle"], font=(self.main_font, 9))
@@ -466,8 +468,9 @@ class GUI:
             return "break"
 
 
-    def clear_rp_entry(self):
+    def clear_rp_widgets(self):
         self.rp_number_entry.delete(0, "end")
+        self.rp_error_label.configure(text="")
 
 
     def show_suggestion_request_view(self):
@@ -629,8 +632,12 @@ class GUI:
         self.highlight_errors(results)
 
         if all(results.values()):
-            self.processor.retrieve_rates()
-            self.display_rates()
+            rates_success = self.processor.retrieve_rates()
+
+            if rates_success:
+                self.display_rates()
+            else:
+                self.rp_error_label.configure(text="Failed to retrieve rates. Check shipping details and try again.")
 
 
     def display_rates(self):
@@ -645,11 +652,13 @@ class GUI:
         x = (screen_width - width) // 2
         y = (screen_height - height) // 2
 
+        self.rates_table_configurable = True
+
         self.rates_window.geometry(f"{width}x{height}+{x}+{y}")
         self.rates_window.transient(self.root)
         self.rates_window.resizable(False, False)
 
-        self.rates_window.protocol("WM_DELETE_WINDOW", self.return_to_preshipment_details)
+        self.rates_window.protocol("WM_DELETE_WINDOW", self.manually_close_rates)
 
         columns = ("service_type", "estimated_delivery_time", "estimated_delivery_cost")
 
@@ -697,12 +706,12 @@ class GUI:
         self.finalize_shipment_button.pack(side="left")
 
         # View 2: Label successfully created
-        self.successful_shipment_view = ttk.Frame(self.rates_button_panel, style="SuggestionBody.TFrame")
-        self.successful_shipment_view.grid(row=0, column=0)
+        self.post_finalization_view = ttk.Frame(self.rates_button_panel, style="SuggestionBody.TFrame")
+        self.post_finalization_view.grid(row=0, column=0)
 
-        self.new_shipment_button = ttk.Button(self.successful_shipment_view, text="New Shipment", command=self.start_new_shipment)
+        self.new_shipment_button = ttk.Button(self.post_finalization_view, text="New Shipment", command=self.start_new_shipment)
         self.new_shipment_button.pack(side="left")
-        self.exit_application_button = ttk.Button(self.successful_shipment_view, text="Exit", style="Primary.TButton", command=self.exit_application)
+        self.exit_application_button = ttk.Button(self.post_finalization_view, text="Exit App", style="Primary.TButton", command=self.exit_application)
         self.exit_application_button.pack(side="left")
 
         # Final setup for rates popup
@@ -712,7 +721,17 @@ class GUI:
         self.rates_table.focus_set()
 
 
+    def manually_close_rates(self):
+        if self.rates_table_configurable:
+            self.return_to_preshipment_details()
+        else:
+            self.start_new_shipment()
+
+
     def on_table_click(self, event):
+        if not self.rates_table_configurable:
+            return "break"
+
         row_id = self.rates_table.identify_row(event.y)
 
         if row_id and "date_header" in self.rates_table.item(row_id, "tags"):
@@ -720,6 +739,9 @@ class GUI:
 
 
     def navigate_rates(self, event):
+        if not self.rates_table_configurable:
+            return "break"
+
         current_row = self.rates_table.focus()
         if not current_row:
             current_row = "0"
@@ -765,6 +787,9 @@ class GUI:
 
 
     def finalize_shipment(self, event=None):
+        if not self.rates_table_configurable:
+            return "break"
+
         selection = self.rates_table.selection()
         if selection:
             selected_rate_id = self.rates_table.selection()[0]
@@ -774,16 +799,21 @@ class GUI:
         selected_rate_option = self.processor.rates.options[int(selected_rate_id)]
         final_shipment_data = self.processor.build_final_shipment_data(selected_rate_option.service_type)
         label_success = self.processor.create_and_save_label(final_shipment_data)
+
         if label_success:
             output_directory = "output_labels"
             self.rates_status_message.configure(text=f"Label saved to {output_directory}!", style="RatesSuccess.TLabel")
-            self.successful_shipment_view.tkraise()
         else:
             self.rates_status_message.configure(text="Failed to generate FedEx label.")
 
+        self.post_finalization_view.tkraise()
+        self.rates_table.configure(selectmode="none", takefocus=False)
+        self.rates_table_configurable = False
+        self.exit_application_button.focus_set()
+        return
+
 
     def start_new_shipment(self):
-        self.processor.clear_rates()
         self.rates_window.destroy()
 
         self.processor.clear_preshipment_details()
@@ -791,11 +821,11 @@ class GUI:
         self.processor.clear_suggested_address()
 
         self.sync_preshipment_details_from_processor_to_gui()
-        self.clear_rp_entry()
+        self.clear_rp_widgets()
 
 
     def exit_application(self):
-        pass
+        self.root.destroy()
 
 
     def run(self):

@@ -1,7 +1,6 @@
 import requests
 from config import APIEnvironment
 from payload_builders import build_address_validation_payload, build_fedex_ship_payload, build_fedex_rates_payload
-from schema_classes import RatesOption, RatesOptions
 from private import (
     test_key_account_number,
     shipper_account_number,
@@ -22,12 +21,13 @@ def request_access_token(api_key, secret_key, environment):
         'client_secret': secret_key,
     }
     response = requests.post(url, data=payload, headers=headers, timeout=30)
-
     print(f"Token request status code: {response.status_code}")
     response.raise_for_status()
+
     token = response.json().get("access_token")
     if not token:
-        raise RuntimeError("FedEx reponse did not contain access token")
+        raise RuntimeError("FedEx reponse did not contain a valid access token")
+
     return token
 
 
@@ -49,11 +49,11 @@ def request_suggested_address(sandbox_auth_token, production_auth_token, address
     }
 
     response = requests.post(url, json=payload, headers=headers, timeout=30)
-
     print(f"Address validation status code: {response.status_code}")
     response.raise_for_status()
+    suggestion_response_json = response.json()
 
-    return response
+    return suggestion_response_json
 
 
 def request_rates_options(sandbox_auth_token, production_auth_token, shipment_data, environment):
@@ -66,31 +66,19 @@ def request_rates_options(sandbox_auth_token, production_auth_token, shipment_da
         token = production_auth_token
         account_number = shipper_account_number
 
+    payload = build_fedex_rates_payload(shipment_data, account_number)
     headers = {
         'Content-Type': "application/json",
         'X-locale': "en_US",
         'Authorization': f"Bearer {token}"
     }
 
-    payload = build_fedex_rates_payload(shipment_data, account_number)
     response = requests.post(url, json=payload, headers=headers, timeout=30)
-
     print(f"Rates retrieval status code: {response.status_code}")
     response.raise_for_status()
-    rates_data = response.json()
+    rates_response_json = response.json()
 
-    rates_options = []
-    for rates_option in rates_data["output"]["rateReplyDetails"]:
-        rates_options.append(
-            RatesOption(
-                service_type=rates_option["serviceType"],
-                estimated_delivery_time=rates_option["commit"]["dateDetail"]["dayFormat"],
-                estimated_delivery_cost=rates_option["ratedShipmentDetails"][0]["totalNetFedExCharge"],
-            )
-        )
-
-    rates_options = RatesOptions(options=rates_options)
-    return rates_options
+    return rates_response_json
 
 
 def request_shipping_label(sandbox_auth_token, production_auth_token, shipment_data, environment):
@@ -103,18 +91,16 @@ def request_shipping_label(sandbox_auth_token, production_auth_token, shipment_d
         token = production_auth_token
         account_number = shipper_account_number
 
+    payload = build_fedex_ship_payload(shipment_data, account_number)
     headers = {
         'Content-Type': "application/json",
         'X-locale': "en_US",
         'Authorization': f"Bearer {token}"
     }
 
-    label_payload = build_fedex_ship_payload(shipment_data, account_number)
-    response = requests.post(url, json=label_payload, headers=headers, timeout=30)
-
+    response = requests.post(url, json=payload, headers=headers, timeout=30)
     print(f"Label creation status code: {response.status_code}")
-
     response.raise_for_status()
-    response_data = response.json()
+    ship_response_json = response.json()
 
-    return response_data
+    return ship_response_json

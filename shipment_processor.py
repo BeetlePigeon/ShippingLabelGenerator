@@ -6,9 +6,9 @@ from pathlib import Path
 from scraper import Scraper
 from parser import Parser
 from tables import state_codes
+from schema_classes import Address, Shipment, RatesOption, RatesOptions
 from config import APIEnvironment, ship_API_config, rates_API_config, validation_API_config, DEFAULT_SHIPMENT_WEIGHT
 from api_requests import request_access_token, request_suggested_address, request_rates_options, request_shipping_label
-from schema_classes import Address, Shipment
 from private import (
     sandbox_api_key,
     sandbox_secret_key,
@@ -370,9 +370,9 @@ class Processor:
                 self.preshipment_details["postal_code"],
             )
 
-        data = request_suggested_address(self.sandbox_token, self.production_token, address, validation_API_config).json()
+        response_json = request_suggested_address(self.sandbox_token, self.production_token, address, validation_API_config).json()
 
-        resolved_addresses = data.get("output", {}).get("resolvedAddresses") or []
+        resolved_addresses = response_json.get("output", {}).get("resolvedAddresses") or []
 
         if not resolved_addresses:
             raise ValueError("FedEx returned no resolved addresses.")
@@ -397,8 +397,30 @@ class Processor:
 
     def retrieve_rates(self):
         preshipment_data = self.build_preshipment_data()
-        rates = request_rates_options(self.sandbox_token, self.production_token, preshipment_data, rates_API_config)
-        self.rates = rates
+        rates_options = []
+
+        response_json = request_rates_options(self.sandbox_token, self.production_token, preshipment_data, rates_API_config)
+
+        errors = response_json.get("errors")
+        if errors:
+            return False
+
+        rate_reply_details = response_json.get("output", {}).get("rateReplyDetails", [])
+
+        if not rate_reply_details:
+            return False
+
+        for rates_option in rate_reply_details:
+            rates_options.append(
+                RatesOption(
+                    service_type=rates_option["serviceType"],
+                    estimated_delivery_time=rates_option["commit"]["dateDetail"]["dayFormat"],
+                    estimated_delivery_cost=rates_option["ratedShipmentDetails"][0]["totalNetFedExCharge"],
+                )
+            )
+
+        self.rates = RatesOptions(options=rates_options)
+        return True
 
 
     def clear_rates(self):
@@ -406,13 +428,13 @@ class Processor:
 
 
     def create_and_save_label(self, shipment_data):
-        response_data = request_shipping_label(self.sandbox_token, self.production_token, shipment_data, ship_API_config)
+        response_json = request_shipping_label(self.sandbox_token, self.production_token, shipment_data, ship_API_config)
 
-        errors = response_data.get("errors")
+        errors = response_json.get("errors")
         if errors:
             return False
 
-        shipments = response_data.get("output", {}).get("transactionShipments", [])
+        shipments = response_json.get("output", {}).get("transactionShipments", [])
         if not shipments:
             return False
 
