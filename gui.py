@@ -6,12 +6,20 @@ from private import rp_url_prefix
 from PIL import Image, ImageTk
 from pathlib import Path
 from tables import state_codes
+from concurrent.futures import ThreadPoolExecutor
 
 
 class GUI:
     def __init__(self):
 
         self.processor = Processor()
+
+        self.executor = ThreadPoolExecutor(max_workers=1)
+        self.executor_running = False
+
+        self.main_buttons = []
+        self.radiobuttons = []
+        self.entries = {}
 
         self.root = tkinter.Tk()
         self.root.title("FedEx Shipping Label Generator")
@@ -28,12 +36,12 @@ class GUI:
 
         self.configure_styles()
 
-        self.main_frame = ttk.Frame(self.root, padding=(22, 18, 22, 12))
+        self.main_frame = ttk.Frame(self.root, padding=(22, 12, 22, 12))
         self.main_frame.pack(fill="both", expand=True)
         self.main_frame.columnconfigure(0, weight=1)
 
         title_frame = ttk.Frame(self.main_frame)
-        title_frame.grid(row=0, column=0, sticky="ew", pady=(0, 15))
+        title_frame.grid(row=0, column=0, sticky="ew", pady=(0, 10))
         title_frame.columnconfigure(0, weight=1)
 
         header_inner = ttk.Frame(title_frame)
@@ -47,7 +55,7 @@ class GUI:
         ttk.Label(header_inner, text="Shipping Label Generator", font=(self.main_font, 18, "bold")).pack(side="left")
 
         self.rp_outer_frame = ttk.Frame(self.main_frame, padding=(12, 10), style="Card.TFrame")
-        self.rp_outer_frame.grid(row=1, column=0, sticky="ew", pady=(0, 15))
+        self.rp_outer_frame.grid(row=1, column=0, sticky="ew", pady=(0, 6))
         self.rp_outer_frame.columnconfigure(0, weight=1)
 
         self.rp_frame = ttk.Frame(self.rp_outer_frame, style="CardInterior.TFrame")
@@ -63,17 +71,26 @@ class GUI:
         self.rp_number_entry = ttk.Entry(rp_controls_frame, width=26, validate="key", validatecommand=validate_command)
         self.rp_number_entry.pack(side="left")
         self.rp_number_entry.bind("<<Paste>>", self.handle_rp_paste)
+        self.entries["rp_number"] = self.rp_number_entry
 
         self.rp_paste_button = ttk.Button(rp_controls_frame, text="⧉", width=2, style="Icon.TButton", command=self.handle_rp_paste)
         self.rp_paste_button.pack(side="left", padx=(3, 10))
+        self.main_buttons.append(self.rp_paste_button)
 
         self.lookup_button = ttk.Button(rp_controls_frame, text="Lookup", style="Primary.TButton", command=self.lookup_and_display_preshipment_details)
         self.lookup_button.pack(side="left")
+        self.main_buttons.append(self.lookup_button)
 
         self.rp_number_entry.bind("<Return>", lambda event: self.lookup_button.invoke())
 
         self.rp_error_label = ttk.Label(self.rp_outer_frame, text="", style="Error.TLabel")
         self.rp_error_label.grid(row=1, column=0, pady=(5, 0))
+
+        self.progress_bar = ttk.Progressbar(self.rp_outer_frame, orient="horizontal", mode="indeterminate", length=180)
+        self.root.update_idletasks()
+        self.rp_outer_frame.rowconfigure(2, minsize=self.progress_bar.winfo_reqheight())
+        self.progress_bar.grid(row=2, column=0)
+        self.progress_bar.grid_remove()
 
         self.results_frame = ttk.Frame(self.main_frame)
         self.results_frame.grid(row=2, column=0, sticky="nsew")
@@ -99,8 +116,6 @@ class GUI:
         tkinter.StringVar(value=self.processor.preshipment_details["other_email_3"]),
             ]
 
-        self.widgets = {}
-
         self.create_preshipment_sections()
 
         self._updating_address = False
@@ -120,13 +135,22 @@ class GUI:
         action_frame = ttk.Frame(self.main_frame)
         action_frame.grid(row=3, column=0, pady=(8, 0))
 
-        self.clear_shipment_details_button = ttk.Button(action_frame, text="Clear All", command=self.clear_preshipment_widgets)
+        self.clear_shipment_details_button = ttk.Button(action_frame, text="Clear All", command=self.clear_preshipment_entries)
         self.clear_shipment_details_button.pack(side="left", padx=7)
+        self.main_buttons.append(self.clear_shipment_details_button)
 
         self.retrieve_rates_button = ttk.Button(action_frame, text="Retrieve Rates", style="Primary.TButton", state="normal", command=self.attempt_retrieve_rates)
         self.retrieve_rates_button.pack(side="left", padx=7)
+        self.main_buttons.append(self.retrieve_rates_button)
 
         self.root.protocol("WM_DELETE_WINDOW", self.exit_application)
+
+        self.root.update_idletasks()
+        window_width = self.root.winfo_reqwidth()
+        screen_width = self.root.winfo_screenwidth()
+
+        x = (screen_width - window_width) // 2
+        self.root.geometry(f"+{x}+0")
 
 
     def handle_callback_exception(self, exception, value, traceback):
@@ -166,6 +190,9 @@ class GUI:
             "suggestion_field": "#e8f0fa",
             "suggestion_button": "#dceafe",
 
+            "disabled_fbg": "#d8dee7",
+            "disabled_fg": "#8894a6",
+
             "primary": "#4878b7",
             "primary_hover": "#3968a5",
 
@@ -184,6 +211,7 @@ class GUI:
         style = ttk.Style(self.root)
         style.theme_use("clam")
 
+        style.configure("Horizontal.TProgressbar", thickness=8)
         style.configure("Required.TLabel", background=c["surface"], foreground=c["asterisk"], font=(self.main_font, 10, "bold"))
         style.configure("TFrame", background=c["bg"])
         style.configure("Card.TFrame", background=c["surface"], relief="solid", borderwidth=1, bordercolor=c["border"])
@@ -199,9 +227,9 @@ class GUI:
         style.configure("ActionHint.TLabel", background=c["bg"], foreground=c["subtitle"], font=(self.main_font, 9))
         style.configure("ActionHintSuccess.TLabel", background=c["bg"], foreground=c["success"], font=(self.main_font, 9, "bold"))
         style.configure("TEntry", fieldbackground="white", bordercolor=c["border"], lightcolor=c["border"], darkcolor=c["border"], relief="flat", borderwidth=1, padding=4, font=(self.main_font, 10))
-        style.map("TEntry", bordercolor=[("invalid", c["asterisk"]),("focus", c["input_focus"])])
+        style.map("TEntry", fieldbackground=[("disabled", c["disabled_fbg"])], foreground=[("disabled", c["disabled_fg"])], bordercolor=[("invalid", c["asterisk"]),("focus", c["input_focus"])])
         style.configure("TCombobox", fieldbackground="white", background=c["combobox"], bordercolor=c["border"], lightcolor=c["border"], darkcolor=c["border"], padding=4, font=(self.main_font, 10))
-        style.map("TCombobox", fieldbackground=[("readonly", "white")], bordercolor=[("invalid", c["asterisk"])])
+        style.map("TCombobox", fieldbackground=[("disabled", c["disabled_fbg"]), ("readonly", "white")], foreground=[("disabled", c["disabled_fg"])], bordercolor=[("invalid", c["asterisk"])])
         style.configure("TButton", background=c["button"], foreground=c["ink"], borderwidth=1, relief="flat", bordercolor=c["border"], padding=(10, 5), font=(self.main_font, 10))
         style.map("TButton", background=[("active", c["button_hover"])])
         style.configure("Icon.TButton", background=c["button"], foreground=c["ink"], bordercolor=c["border"], borderwidth=1, relief="flat", padding=(4, 3), font=(self.secondary_font, 11))
@@ -252,17 +280,17 @@ class GUI:
         self.recipient_header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 12))
 
         self.create_field_label(self.recipient_frame, "Name", 1, required=True)
-        self.widgets["recipient_name"] = ttk.Entry(self.recipient_frame, textvariable=self.recipient_name, width=36)
-        self.widgets["recipient_name"].grid(row=1, column=1, sticky="ew", padx=5, pady=3)
+        self.entries["recipient_name"] = ttk.Entry(self.recipient_frame, textvariable=self.recipient_name, width=36)
+        self.entries["recipient_name"].grid(row=1, column=1, sticky="ew", padx=5, pady=3)
 
         self.create_field_label(self.recipient_frame, "Email", 2, required=False)
-        self.widgets["recipient_email"] = ttk.Entry(self.recipient_frame, textvariable=self.recipient_email, width=36)
-        self.widgets["recipient_email"].grid(row=2, column=1, sticky="ew", padx=5, pady=3)
+        self.entries["recipient_email"] = ttk.Entry(self.recipient_frame, textvariable=self.recipient_email, width=36)
+        self.entries["recipient_email"].grid(row=2, column=1, sticky="ew", padx=5, pady=3)
 
         phone_validation = (self.root.register(self.validate_phone_entry), "%P")
         self.create_field_label(self.recipient_frame, "Phone", 3, required=False)
-        self.widgets["recipient_phone"] = ttk.Entry(self.recipient_frame, textvariable=self.recipient_phone, width=36, validate="key", validatecommand=phone_validation)
-        self.widgets["recipient_phone"].grid(row=3, column=1, sticky="ew", padx=5, pady=3)
+        self.entries["recipient_phone"] = ttk.Entry(self.recipient_frame, textvariable=self.recipient_phone, width=36, validate="key", validatecommand=phone_validation)
+        self.entries["recipient_phone"].grid(row=3, column=1, sticky="ew", padx=5, pady=3)
 
         self.other_frame = ttk.Frame(left_column, padding=4, style="Card.TFrame")
         self.other_frame.grid(row=1, column=0, sticky="ew")
@@ -285,7 +313,7 @@ class GUI:
             ttk.Label(self.other_frame, style="Card.TLabel", text=field_name).grid(row=row + 1, column=0, sticky="w", padx=5, pady=3)
             entry = ttk.Entry(self.other_frame, textvariable=field_value, width=36)
 
-            self.widgets[key] = entry
+            self.entries[key] = entry
 
             if field_name == "Weight (lbs)":
                 entry.configure(validate="key", validatecommand=weight_validation)
@@ -300,12 +328,12 @@ class GUI:
         self.address_header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 12))
 
         self.create_field_label(self.address_frame, "Street line 1", row=1, required=True, pady=4)
-        self.widgets["street_line_one"] = ttk.Entry(self.address_frame, textvariable=self.street_line_one, width=36)
-        self.widgets["street_line_one"].grid(row=1, column=1, sticky="ew", padx=5, pady=4)
+        self.entries["street_line_one"] = ttk.Entry(self.address_frame, textvariable=self.street_line_one, width=36)
+        self.entries["street_line_one"].grid(row=1, column=1, sticky="ew", padx=5, pady=4)
 
         self.create_field_label(self.address_frame, "Street line 2", row=2, required=False, pady=4)
-        self.widgets["street_line_two"] = ttk.Entry(self.address_frame, textvariable=self.street_line_two, width=36)
-        self.widgets["street_line_two"].grid(row=2, column=1, sticky="ew", padx=5, pady=4)
+        self.entries["street_line_two"] = ttk.Entry(self.address_frame, textvariable=self.street_line_two, width=36)
+        self.entries["street_line_two"].grid(row=2, column=1, sticky="ew", padx=5, pady=4)
 
         self.bottom_frame = ttk.Frame(self.address_frame, style="CardInterior.TFrame")
         self.bottom_frame.grid(row=3, column=0, columnspan=2, sticky="ew", padx=5, pady=8)
@@ -325,10 +353,12 @@ class GUI:
         ttk.Label(radio_frame, text="Residential", style="Card.TLabel").grid(row=0, column=0, sticky="w", pady=3)
         self.residential_radiobutton = ttk.Radiobutton(radio_frame, style="Card.TRadiobutton", variable=self.address_is_commercial, value=0)
         self.residential_radiobutton.grid(row=0, column=1, padx=8)
+        self.radiobuttons.append(self.residential_radiobutton)
 
         ttk.Label(radio_frame, text="Commercial", style="Card.TLabel").grid(row=1, column=0, sticky="w", pady=3)
         self.commercial_radiobutton = ttk.Radiobutton(radio_frame, style="Card.TRadiobutton", variable=self.address_is_commercial, value=1)
         self.commercial_radiobutton.grid(row=1, column=1, padx=8)
+        self.radiobuttons.append(self.commercial_radiobutton)
 
         self.location_frame = ttk.Frame(self.bottom_frame, style="CardInterior.TFrame")
         self.location_frame.grid(row=0, column=1, sticky="ew")
@@ -336,17 +366,17 @@ class GUI:
         self.location_frame.columnconfigure(1, weight=1, uniform="location")
 
         self.create_field_label(self.location_frame, "City", row=0, required=True, padx=0, pady=0)
-        self.widgets["city"] = ttk.Entry(self.location_frame, textvariable=self.city)
-        self.widgets["city"].grid(row=1, column=0, columnspan=2, sticky="ew", pady=(2, 10))
+        self.entries["city"] = ttk.Entry(self.location_frame, textvariable=self.city)
+        self.entries["city"].grid(row=1, column=0, columnspan=2, sticky="ew", pady=(2, 10))
 
         self.create_field_label(self.location_frame, "State", row=2, column=0, required=True, padx=0, pady=0)
-        self.widgets["state_code"] = ttk.Combobox(self.location_frame, textvariable=self.state_code, values=state_codes, state="readonly", width=6)
-        self.widgets["state_code"].grid(row=3, column=0, sticky="ew", padx=(0, 5), pady=2)
+        self.entries["state_code"] = ttk.Combobox(self.location_frame, textvariable=self.state_code, values=state_codes, state="readonly", width=6)
+        self.entries["state_code"].grid(row=3, column=0, sticky="ew", padx=(0, 5), pady=2)
 
         zip_validation = (self.root.register(self.validate_zip_entry), "%P")
         self.create_field_label(self.location_frame, "ZIP", row=2, column=1, required=True, padx=(5, 0), pady=0)
-        self.widgets["postal_code"] = ttk.Entry(self.location_frame, textvariable=self.postal_code, width=10, validate="key", validatecommand=zip_validation)
-        self.widgets["postal_code"].grid(row=3, column=1, sticky="ew", padx=(5, 0), pady=2)
+        self.entries["postal_code"] = ttk.Entry(self.location_frame, textvariable=self.postal_code, width=10, validate="key", validatecommand=zip_validation)
+        self.entries["postal_code"].grid(row=3, column=1, sticky="ew", padx=(5, 0), pady=2)
 
         self.address_frame.rowconfigure(4, weight=1)
 
@@ -366,6 +396,7 @@ class GUI:
 
         self.suggest_address_button = ttk.Button(self.suggestion_request_view, text="Suggest Address?", image=self.pin_icon, compound="left", style="SuggestAction.TButton", command=self.suggest_address)
         self.suggest_address_button.grid(row=0, column=0)
+        self.main_buttons.append(self.suggest_address_button)
 
         # View 2
         self.suggestion_result_view = ttk.Frame(self.suggestion_panel, style="SuggestionBody.TFrame")
@@ -386,9 +417,11 @@ class GUI:
 
         self.use_suggested_button = ttk.Button(choice_frame, text="Use Suggested Address", style="Compact.TButton", state="disabled", command=self.use_suggested_address)
         self.use_suggested_button.pack(side="left", padx=(0, 5))
+        self.main_buttons.append(self.use_suggested_button)
 
         self.use_entered_button = ttk.Button(choice_frame, text="Use Address As Entered", style="Compact.TButton", state="disabled", command=self.use_address_as_entered)
         self.use_entered_button.pack(side="left", padx=(5, 0))
+        self.main_buttons.append(self.use_entered_button)
 
         # View 3
         self.suggestion_approve_view = ttk.Frame(self.suggestion_panel, style="SuggestionBody.TFrame")
@@ -480,6 +513,62 @@ class GUI:
         self.rp_error_label.configure(text="")
 
 
+    def disable_gui_widgets(self):
+        widgets = [*self.entries.values(), *self.main_buttons, *self.radiobuttons]
+
+        self.previously_enabled = [widget for widget in widgets if not widget.instate(["disabled"])]
+
+        for widget in widgets:
+            widget.state(["disabled"])
+
+
+    def enable_gui_widgets(self):
+        for widget in self.previously_enabled:
+            widget.state(["!disabled"])
+
+
+    def lookup_and_display_preshipment_details(self):
+        if self.executor_running:
+            return
+
+        self.rp_error_label.config(text="Request lookup in progress...")
+        self.start_progress_bar()
+        self.clear_preshipment_entries()
+
+        request_number = self.rp_number_entry.get().strip()
+        future = self.executor.submit(self.processor.load_preshipment_details_from_scraper, request_number)
+        self.executor_running = True
+        self.disable_gui_widgets()
+        self.root.after(50, self.check_lookup_result, future)
+
+
+    def check_lookup_result(self, future):
+        if future.done():
+            self.executor_running = False
+            self.stop_progress_bar()
+            self.enable_gui_widgets()
+
+            lookup_success = future.result()
+
+            if lookup_success:
+                self.rp_error_label.config(text="")
+                self.sync_preshipment_details_from_processor_to_gui()
+            else:
+                self.rp_error_label.config(text="Invalid RequestPortal number.")
+        else:
+            self.root.after(50, self.check_lookup_result, future)
+
+
+    def start_progress_bar(self):
+        self.progress_bar.grid()
+        self.progress_bar.start(10)
+
+
+    def stop_progress_bar(self):
+        self.progress_bar.stop()
+        self.progress_bar.grid_remove()
+
+
     def show_suggestion_request_view(self):
         self.suggest_address_button.configure(state="normal")
 
@@ -505,22 +594,9 @@ class GUI:
         self.suggestion_result_view.tkraise()
 
 
-    def clear_preshipment_widgets(self):
+    def clear_preshipment_entries(self):
         self.processor.clear_preshipment_details()
         self.sync_preshipment_details_from_processor_to_gui()
-
-
-    def lookup_and_display_preshipment_details(self):
-        self.clear_preshipment_widgets()
-
-        request_number = self.rp_number_entry.get().strip()
-        lookup_success = self.processor.load_preshipment_details_from_scraper(request_number)
-
-        if lookup_success:
-            self.rp_error_label.config(text="")
-            self.sync_preshipment_details_from_processor_to_gui()
-        else:
-            self.rp_error_label.config(text="Invalid RequestPortal number.")
 
 
     def sync_address_from_processor_to_gui(self):
@@ -575,20 +651,42 @@ class GUI:
 
 
     def suggest_address(self):
-        if not self.street_line_one.get().strip():
-            self.widgets["street_line_one"].state(["invalid"])
+        if self.executor_running:
             return
 
+        if not self.street_line_one.get().strip():
+            self.entries["street_line_one"].state(["invalid"])
+            return
+
+        self.rp_error_label.config(text="Finding address suggestions...")
+        self.start_progress_bar()
+        self.executor_running = True
         self.sync_preshipment_details_from_gui_to_processor()
-        confirmed, address, is_commercial = self.processor.get_suggested_address()
+        future = self.executor.submit(self.processor.get_suggested_address)
+        self.disable_gui_widgets()
+        self.root.after(50, self.check_suggestion_result, future)
 
-        if confirmed is True:
-            self.processor.set_suggested_address(address, is_commercial)
-            self.display_suggested_address()
+
+    def check_suggestion_result(self, future):
+        if future.done():
+            self.executor_running = False
+            self.stop_progress_bar()
+            self.enable_gui_widgets()
+            self.rp_error_label.config(text="")
+
+            confirmed, address, is_commercial = future.result()
+
+
+            if confirmed is True:
+                self.processor.set_suggested_address(address, is_commercial)
+                self.display_suggested_address()
+            else:
+                self.suggested_address_display.set("")
+
+            self.show_suggestion_result_view(confirmed=confirmed is True)
+
         else:
-            self.suggested_address_display.set("")
-
-        self.show_suggestion_result_view(confirmed=confirmed is True)
+            self.root.after(50, self.check_suggestion_result, future)
 
 
     def display_suggested_address(self):
@@ -617,11 +715,11 @@ class GUI:
 
 
     def highlight_errors(self, results: dict) -> None:
-        for key, widget in self.widgets.items():
+        for key, entry in self.entries.items():
             if results.get(key, True):
-                widget.state(["!invalid"])
+                entry.state(["!invalid"])
             else:
-                widget.state(["invalid"])
+                entry.state(["invalid"])
 
         if results.get("address_type", True):
             self.type_frame.configure(style="AddressType.TFrame")
@@ -630,27 +728,46 @@ class GUI:
 
 
     def clear_errors(self):
-        for key, widget in self.widgets.items():
-            widget.state(["!invalid"])
+        for key, entry in self.entries.items():
+            entry.state(["!invalid"])
 
         self.type_frame.configure(style="AddressType.TFrame")
 
 
     def attempt_retrieve_rates(self):
+        if self.executor_running:
+            return
+
         self.rp_error_label.configure(text="")
-
         self.sync_preshipment_details_from_gui_to_processor()
-
         results = self.processor.is_preshipment_valid()
         self.highlight_errors(results)
 
         if all(results.values()):
-            rates_success = self.processor.retrieve_rates()
+            self.rp_error_label.config(text="Retrieving rates...")
+            self.start_progress_bar()
+            self.executor_running = True
+            future = self.executor.submit(self.processor.retrieve_rates)
+            self.disable_gui_widgets()
+            self.root.after(50, self.check_rates_result, future)
+
+
+    def check_rates_result(self, future):
+        if future.done():
+            self.executor_running = False
+            self.stop_progress_bar()
+            self.enable_gui_widgets()
+            self.rp_error_label.config(text="")
+
+            rates_success = future.result()
 
             if rates_success:
                 self.display_rates()
             else:
                 self.rp_error_label.configure(text="Failed to retrieve rates. Check shipping details and try again.")
+
+        else:
+            self.root.after(50, self.check_rates_result, future)
 
 
     def display_rates(self):
@@ -715,6 +832,7 @@ class GUI:
 
         self.edit_shipment_button = ttk.Button(self.finalize_shipment_view, text="Edit Details", width=14, command=self.return_to_preshipment_details)
         self.edit_shipment_button.pack(side="left")
+
         self.finalize_shipment_button = ttk.Button(self.finalize_shipment_view, text="Finalize Shipment", width=22, style="Primary.TButton", command=self.finalize_shipment, state="disabled")
         self.finalize_shipment_button.pack(side="left")
 
@@ -724,6 +842,7 @@ class GUI:
 
         self.new_shipment_button = ttk.Button(self.post_finalization_view, text="New Shipment", width=14, command=self.start_new_shipment)
         self.new_shipment_button.pack(side="left")
+
         self.exit_application_button = ttk.Button(self.post_finalization_view, text="Exit App", width=22, style="Primary.TButton", command=self.exit_application)
         self.exit_application_button.pack(side="left")
 
