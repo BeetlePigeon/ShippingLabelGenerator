@@ -21,7 +21,6 @@ def request_access_token(api_key, secret_key, environment):
         'client_secret': secret_key,
     }
     response = requests.post(url, data=payload, headers=headers, timeout=30)
-    print(f"Token request status code: {response.status_code}")
     response.raise_for_status()
 
     token = response.json().get("access_token")
@@ -49,7 +48,6 @@ def request_suggested_address(sandbox_auth_token, production_auth_token, address
     }
 
     response = requests.post(url, json=payload, headers=headers, timeout=30)
-    print(f"Address validation status code: {response.status_code}")
     response.raise_for_status()
     suggestion_response_json = response.json()
 
@@ -74,7 +72,6 @@ def request_rates_options(sandbox_auth_token, production_auth_token, shipment_da
     }
 
     response = requests.post(url, json=payload, headers=headers, timeout=30)
-    print(f"Rates retrieval status code: {response.status_code}")
     response.raise_for_status()
     rates_response_json = response.json()
 
@@ -99,7 +96,6 @@ def request_shipping_label(sandbox_auth_token, production_auth_token, shipment_d
     }
 
     response = requests.post(url, json=payload, headers=headers, timeout=30)
-    print(f"Label creation status code: {response.status_code}")
     response.raise_for_status()
     ship_response_json = response.json()
 

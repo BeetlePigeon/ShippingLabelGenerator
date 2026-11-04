@@ -15,6 +15,8 @@ class GUI:
         self.root = tkinter.Tk()
         self.root.title("FedEx Shipping Label Generator")
 
+        self.root.report_callback_exception = self.handle_callback_exception
+
         self.main_font = "Segoe UI"
         self.secondary_font = "Segoe UI Symbol"
 
@@ -124,6 +126,10 @@ class GUI:
         self.retrieve_rates_button.pack(side="left", padx=7)
 
         self.root.protocol("WM_DELETE_WINDOW", self.exit_application)
+
+
+    def handle_callback_exception(self):
+        self.root.destroy()
 
 
     @staticmethod
@@ -568,6 +574,10 @@ class GUI:
 
 
     def suggest_address(self):
+        if not self.street_line_one.get().strip():
+            self.widgets["street_line_one"].state(["invalid"])
+            return
+
         self.sync_preshipment_details_from_gui_to_processor()
         confirmed, address, is_commercial = self.processor.get_suggested_address()
 
@@ -626,6 +636,8 @@ class GUI:
 
 
     def attempt_retrieve_rates(self):
+        self.rp_error_label.configure(text="")
+
         self.sync_preshipment_details_from_gui_to_processor()
 
         results = self.processor.is_preshipment_valid()
@@ -696,22 +708,22 @@ class GUI:
         self.rates_status_message = ttk.Label(self.rates_button_panel, text="", style="RatesError.TLabel", width=30)
         self.rates_status_message.grid(row=1, column=0)
 
-        # View 1: No label created
+        # View 1: Before finalization
         self.finalize_shipment_view = ttk.Frame(self.rates_button_panel, style="SuggestionBody.TFrame")
         self.finalize_shipment_view.grid(row=0, column=0)
 
-        self.edit_shipment_button = ttk.Button(self.finalize_shipment_view, text="Edit Details", command=self.return_to_preshipment_details)
+        self.edit_shipment_button = ttk.Button(self.finalize_shipment_view, text="Edit Details", width=14, command=self.return_to_preshipment_details)
         self.edit_shipment_button.pack(side="left")
-        self.finalize_shipment_button = ttk.Button(self.finalize_shipment_view, text="Finalize Shipment", style="Primary.TButton", command=self.finalize_shipment, state="disabled")
+        self.finalize_shipment_button = ttk.Button(self.finalize_shipment_view, text="Finalize Shipment", width=22, style="Primary.TButton", command=self.finalize_shipment, state="disabled")
         self.finalize_shipment_button.pack(side="left")
 
-        # View 2: Label successfully created
+        # View 2: After finalization attempted
         self.post_finalization_view = ttk.Frame(self.rates_button_panel, style="SuggestionBody.TFrame")
         self.post_finalization_view.grid(row=0, column=0)
 
-        self.new_shipment_button = ttk.Button(self.post_finalization_view, text="New Shipment", command=self.start_new_shipment)
+        self.new_shipment_button = ttk.Button(self.post_finalization_view, text="New Shipment", width=14, command=self.start_new_shipment)
         self.new_shipment_button.pack(side="left")
-        self.exit_application_button = ttk.Button(self.post_finalization_view, text="Exit App", style="Primary.TButton", command=self.exit_application)
+        self.exit_application_button = ttk.Button(self.post_finalization_view, text="Exit App", width=22, style="Primary.TButton", command=self.exit_application)
         self.exit_application_button.pack(side="left")
 
         # Final setup for rates popup

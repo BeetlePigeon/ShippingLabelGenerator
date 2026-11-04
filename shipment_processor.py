@@ -289,7 +289,6 @@ class Processor:
         elif address_type == "NORMALIZED" and resolved == "false" and dpv == "false" and msg == "STANDARDIZED.ADDRESS.NOTFOUND":
             return False
         else:
-            print(f"unknown case.\nType:{address_type}\nResolved:{resolved}\nDPV:{dpv}\nMessage:{msg}")
             return None
 
 
@@ -370,7 +369,7 @@ class Processor:
                 self.preshipment_details["postal_code"],
             )
 
-        response_json = request_suggested_address(self.sandbox_token, self.production_token, address, validation_API_config).json()
+        response_json = request_suggested_address(self.sandbox_token, self.production_token, address, validation_API_config)
 
         resolved_addresses = response_json.get("output", {}).get("resolvedAddresses") or []
 
