@@ -1,6 +1,7 @@
 import tkinter
 from tkinter import ttk
 from shipment_processor import Processor
+from config import LABEL_SUBDIR
 from private import rp_url_prefix
 from PIL import Image, ImageTk
 from pathlib import Path
@@ -705,7 +706,7 @@ class GUI:
         self.rates_button_panel = ttk.Frame(self.rates_window)
         self.rates_button_panel.pack(side="bottom")
 
-        self.rates_status_message = ttk.Label(self.rates_button_panel, text="", style="RatesError.TLabel", width=30)
+        self.rates_status_message = ttk.Label(self.rates_button_panel, text="", style="RatesError.TLabel", width=90)
         self.rates_status_message.grid(row=1, column=0)
 
         # View 1: Before finalization
@@ -813,8 +814,8 @@ class GUI:
         label_success = self.processor.create_and_save_label(final_shipment_data)
 
         if label_success:
-            output_directory = "output_labels"
-            self.rates_status_message.configure(text=f"Label saved to {output_directory}!", style="RatesSuccess.TLabel")
+            output_directory = Path.home() / LABEL_SUBDIR
+            self.rates_status_message.configure(text=f"Saved label to {output_directory}", style="RatesSuccess.TLabel")
         else:
             self.rates_status_message.configure(text="Failed to generate FedEx label.")
 

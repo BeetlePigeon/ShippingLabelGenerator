@@ -7,7 +7,7 @@ from scraper import Scraper
 from parser import Parser
 from tables import state_codes
 from schema_classes import Address, Shipment, RatesOption, RatesOptions
-from config import APIEnvironment, ship_API_config, rates_API_config, validation_API_config, DEFAULT_SHIPMENT_WEIGHT
+from config import APIEnvironment, ship_API_config, rates_API_config, validation_API_config, LABEL_SUBDIR, DEFAULT_SHIPMENT_WEIGHT
 from api_requests import request_access_token, request_suggested_address, request_rates_options, request_shipping_label
 from private import (
     sandbox_api_key,
@@ -469,9 +469,10 @@ class Processor:
 
     def label_data_to_pdf(self, label_data, tracking_number):
         label_bytes = base64.b64decode(label_data)
-        output_directory = Path(__file__).parent / "output_labels"
+        output_directory = Path.home() / LABEL_SUBDIR
         output_directory.mkdir(exist_ok=True)
         today = date.today()
-        today = today.strftime("%m_%d")
-        label_path = output_directory / f"{self.preshipment_details["recipient_name"]}-{today}-{tracking_number}.pdf"
+        today = today.strftime("%m-%d")
+        cleaned_name = re.sub(r"[^a-zA-Z]", "", self.preshipment_details["recipient_name"])
+        label_path = output_directory / f"{today}_{cleaned_name}_{tracking_number}.pdf"
         label_path.write_bytes(label_bytes)

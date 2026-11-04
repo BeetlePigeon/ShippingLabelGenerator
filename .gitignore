@@ -1,5 +1,4 @@
 .env
-output_labels/
 .idea/
 __pycache__/
 .venv/
