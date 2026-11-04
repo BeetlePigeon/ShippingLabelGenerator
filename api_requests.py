@@ -12,6 +12,7 @@ def request_access_token(api_key, secret_key, environment):
         url = "https://apis-sandbox.fedex.com/oauth/token"
     else:
         url = "https://apis.fedex.com/oauth/token"
+
     headers = {
         'Content-Type': "application/x-www-form-urlencoded"
     }
@@ -20,14 +21,12 @@ def request_access_token(api_key, secret_key, environment):
         'client_id': api_key,
         'client_secret': secret_key,
     }
+
     response = requests.post(url, data=payload, headers=headers, timeout=30)
     response.raise_for_status()
+    response_json = response.json()
 
-    token = response.json().get("access_token")
-    if not token:
-        raise RuntimeError("FedEx reponse did not contain a valid access token")
-
-    return token
+    return response_json
 
 
 def request_suggested_address(sandbox_auth_token, production_auth_token, address, environment):
@@ -49,9 +48,9 @@ def request_suggested_address(sandbox_auth_token, production_auth_token, address
 
     response = requests.post(url, json=payload, headers=headers, timeout=30)
     response.raise_for_status()
-    suggestion_response_json = response.json()
+    response_json = response.json()
 
-    return suggestion_response_json
+    return response_json
 
 
 def request_rates_options(sandbox_auth_token, production_auth_token, shipment_data, environment):
@@ -73,9 +72,9 @@ def request_rates_options(sandbox_auth_token, production_auth_token, shipment_da
 
     response = requests.post(url, json=payload, headers=headers, timeout=30)
     response.raise_for_status()
-    rates_response_json = response.json()
+    response_json = response.json()
 
-    return rates_response_json
+    return response_json
 
 
 def request_shipping_label(sandbox_auth_token, production_auth_token, shipment_data, environment):
@@ -97,6 +96,6 @@ def request_shipping_label(sandbox_auth_token, production_auth_token, shipment_d
 
     response = requests.post(url, json=payload, headers=headers, timeout=30)
     response.raise_for_status()
-    ship_response_json = response.json()
+    response_json = response.json()
 
-    return ship_response_json
+    return response_json

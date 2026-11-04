@@ -128,7 +128,7 @@ class GUI:
         self.root.protocol("WM_DELETE_WINDOW", self.exit_application)
 
 
-    def handle_callback_exception(self):
+    def handle_callback_exception(self, exception, value, traceback):
         self.root.destroy()
 
 

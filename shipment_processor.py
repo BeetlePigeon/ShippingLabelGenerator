@@ -32,8 +32,7 @@ from private import (
 
 class Processor:
     def __init__(self):
-        self.sandbox_token = request_access_token(sandbox_api_key, sandbox_secret_key, APIEnvironment.SANDBOX)
-        self.production_token = request_access_token(production_api_key, production_secret_key, APIEnvironment.PRODUCTION)
+        self.sandbox_token, self.production_token = self.request_tokens()
 
         self.scraper = Scraper()
         self.parser = Parser()
@@ -69,6 +68,19 @@ class Processor:
         }
 
         self.rates = None
+
+
+    def request_tokens(self):
+        sandbox_response_json = request_access_token(sandbox_api_key, sandbox_secret_key, APIEnvironment.SANDBOX)
+        s_token = sandbox_response_json.get("access_token")
+
+        production_response_json = request_access_token(production_api_key, production_secret_key, APIEnvironment.PRODUCTION)
+        p_token = production_response_json.get("access_token")
+
+        if not s_token or not p_token:
+            raise RuntimeError("FedEx reponse did not contain a valid access token")
+
+        return s_token, p_token
 
 
     @staticmethod
