@@ -32,7 +32,8 @@ from private import (
 
 class Processor:
     def __init__(self):
-        self.sandbox_token, self.production_token = self.request_tokens()
+        self.sandbox_token = None
+        self.production_token = None
 
         self.scraper = Scraper()
         self.parser = Parser()
@@ -78,9 +79,11 @@ class Processor:
         p_token = production_response_json.get("access_token")
 
         if not s_token or not p_token:
-            raise RuntimeError("FedEx reponse did not contain a valid access token")
+            return False
 
-        return s_token, p_token
+        self.sandbox_token = s_token
+        self.production_token = p_token
+        return True
 
 
     @staticmethod

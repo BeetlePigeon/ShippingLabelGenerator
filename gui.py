@@ -152,6 +152,8 @@ class GUI:
         x = (screen_width - window_width) // 2
         self.root.geometry(f"+{x}+0")
 
+        self.get_tokens()
+
 
     def handle_callback_exception(self, exception, value, traceback):
         self.root.destroy()
@@ -525,6 +527,36 @@ class GUI:
     def enable_gui_widgets(self):
         for widget in self.previously_enabled:
             widget.state(["!disabled"])
+
+
+    def get_tokens(self):
+        if self.executor_running:
+            return
+
+        self.rp_error_label.config(text="Connecting to FedEx API...")
+        self.start_progress_bar()
+
+        future = self.executor.submit(self.processor.request_tokens)
+        self.executor_running = True
+        self.disable_gui_widgets()
+        self.root.after(50, self.check_tokens_result, future)
+
+
+    def check_tokens_result(self, future):
+        if future.done():
+            self.executor_running = False
+            self.stop_progress_bar()
+
+            tokens_success = future.result()
+
+            if tokens_success:
+                self.rp_error_label.config(text="")
+                self.enable_gui_widgets()
+            else:
+                self.rp_error_label.config(text="FedEx API reponse did not contain a valid access token. Contact your administrator or try again later.")
+
+        else:
+            self.root.after(50, self.check_tokens_result, future)
 
 
     def lookup_and_display_preshipment_details(self):

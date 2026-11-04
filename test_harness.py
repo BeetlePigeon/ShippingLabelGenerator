@@ -1,5 +1,6 @@
 from shipment_processor import Processor
 from test_inputs import test_requests
+import sys
 
 
 class Tester:
@@ -39,6 +40,12 @@ class Tester:
 
 if __name__ == "__main__":
     tester = Tester()
+
+    auth_success = tester.processor.request_tokens()
+
+    if not auth_success:
+        print("FedEx token retrieval failed.")
+        sys.exit()
 
     for request_number, expected_fields in test_requests.items():
         test_results = tester.run_test(request_number, expected_fields)
