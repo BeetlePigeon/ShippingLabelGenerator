@@ -213,7 +213,7 @@ class GUI:
         style = ttk.Style(self.root)
         style.theme_use("clam")
 
-        style.configure("Horizontal.TProgressbar", background=c["primary"], troughcolor=c["sky"], bordercolor=c["sky"], thickness=8, borderwidth=1)
+        style.configure("Horizontal.TProgressbar", background=c["primary"], troughcolor=c["sky"], bordercolor=c["sky"], sliderlength=10, thickness=8, borderwidth=1)
         style.configure("Required.TLabel", background=c["surface"], foreground=c["asterisk"], font=(self.main_font, 10, "bold"))
         style.configure("TFrame", background=c["bg"])
         style.configure("Card.TFrame", background=c["surface"], relief="solid", borderwidth=1, bordercolor=c["border"])
