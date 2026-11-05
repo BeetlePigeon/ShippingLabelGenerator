@@ -806,6 +806,8 @@ class GUI:
         self.rates_window = tkinter.Toplevel(self.root)
         self.rates_window.title("Available Shipping Rates")
 
+        self.rates_buttons = []
+
         width, height = 650, 400
 
         screen_width = self.rates_window.winfo_screenwidth()
@@ -855,8 +857,14 @@ class GUI:
         self.rates_button_panel = ttk.Frame(self.rates_window)
         self.rates_button_panel.pack(side="bottom")
 
-        self.rates_status_message = ttk.Label(self.rates_button_panel, text="", style="RatesError.TLabel", width=90)
+        self.rates_status_message = ttk.Label(self.rates_button_panel, text="", style="RatesError.TLabel", width=90, anchor="center")
         self.rates_status_message.grid(row=1, column=0)
+
+        self.rates_progress_bar = ttk.Progressbar(self.rates_button_panel, orient="horizontal", mode="indeterminate", length=180)
+        self.rates_window.update_idletasks()
+        self.rates_button_panel.rowconfigure(2, minsize=self.rates_progress_bar.winfo_reqheight())
+        self.rates_progress_bar.grid(row=2, column=0)
+        self.rates_progress_bar.grid_remove()
 
         # View 1: Before finalization
         self.finalize_shipment_view = ttk.Frame(self.rates_button_panel, style="SuggestionBody.TFrame")
@@ -864,9 +872,11 @@ class GUI:
 
         self.edit_shipment_button = ttk.Button(self.finalize_shipment_view, text="Edit Details", width=14, command=self.return_to_preshipment_details)
         self.edit_shipment_button.pack(side="left")
+        self.rates_buttons.append(self.edit_shipment_button)
 
         self.finalize_shipment_button = ttk.Button(self.finalize_shipment_view, text="Finalize Shipment", width=22, style="Primary.TButton", command=self.finalize_shipment, state="disabled")
         self.finalize_shipment_button.pack(side="left")
+        self.rates_buttons.append(self.finalize_shipment_button)
 
         # View 2: After finalization attempted
         self.post_finalization_view = ttk.Frame(self.rates_button_panel, style="SuggestionBody.TFrame")
@@ -874,9 +884,11 @@ class GUI:
 
         self.new_shipment_button = ttk.Button(self.post_finalization_view, text="New Shipment", width=14, command=self.start_new_shipment)
         self.new_shipment_button.pack(side="left")
+        self.rates_buttons.append(self.new_shipment_button)
 
         self.exit_application_button = ttk.Button(self.post_finalization_view, text="Exit App", width=22, style="Primary.TButton", command=self.exit_application)
         self.exit_application_button.pack(side="left")
+        self.rates_buttons.append(self.exit_application_button)
 
         # Final setup for rates popup
         self.finalize_shipment_view.tkraise()
@@ -886,6 +898,9 @@ class GUI:
 
 
     def manually_close_rates(self):
+        if self.executor_running:
+            return
+
         if self.rates_table_configurable:
             self.return_to_preshipment_details()
         else:
@@ -932,6 +947,9 @@ class GUI:
 
 
     def update_finalize_button(self, event=None):
+        if self.executor_running:
+            return
+
         selection = self.rates_table.selection()
 
         if selection:
@@ -950,11 +968,37 @@ class GUI:
         self.rates_window.destroy()
 
 
+    def disable_rates_buttons(self):
+        self.previously_enabled_rates_buttons = [button for button in self.rates_buttons if not button.instate(["disabled"])]
+
+        for button in self.rates_buttons:
+            button.state(["disabled"])
+
+
+    def enable_rates_buttons(self):
+        for button in self.previously_enabled_rates_buttons:
+            button.state(["!disabled"])
+
+
+    def start_rates_progress_bar(self):
+        self.rates_progress_bar.grid()
+        self.rates_progress_bar.start(10)
+
+
+    def stop_rates_progress_bar(self):
+        self.rates_progress_bar.stop()
+        self.rates_progress_bar.grid_remove()
+
+
     def finalize_shipment(self, event=None):
+        if self.executor_running:
+            return
+
         if not self.rates_table_configurable:
             return "break"
 
         selection = self.rates_table.selection()
+
         if selection:
             selected_rate_id = self.rates_table.selection()[0]
         else:
@@ -962,19 +1006,36 @@ class GUI:
 
         selected_rate_option = self.processor.rates.options[int(selected_rate_id)]
         final_shipment_data = self.processor.build_final_shipment_data(selected_rate_option.service_type)
-        label_success = self.processor.create_and_save_label(final_shipment_data)
+        future = self.executor.submit(self.processor.create_and_save_label, final_shipment_data)
 
-        if label_success:
-            output_directory = Path.home() / LABEL_SUBDIR
-            self.rates_status_message.configure(text=f"Saved label to {output_directory}", style="RatesSuccess.TLabel")
-        else:
-            self.rates_status_message.configure(text="Failed to generate FedEx label.")
-
-        self.post_finalization_view.tkraise()
+        self.rates_status_message.config(text="Requesting FedEx label...", style="RatesSuccess.TLabel")
+        self.start_rates_progress_bar()
+        self.executor_running = True
+        self.disable_rates_buttons()
         self.rates_table.configure(selectmode="none", takefocus=False)
-        self.rates_table_configurable = False
-        self.exit_application_button.focus_set()
-        return
+        self.root.after(50, self.check_label_result, future)
+
+
+    def check_label_result(self, future):
+        if future.done():
+            self.executor_running = False
+            self.stop_rates_progress_bar()
+            self.enable_rates_buttons()
+
+            label_success = future.result()
+
+            if label_success:
+                output_directory = Path.home() / LABEL_SUBDIR
+                self.rates_status_message.configure(text=f"Saved label to {output_directory}", style="RatesSuccess.TLabel")
+            else:
+                self.rates_status_message.configure(text="Failed to generate FedEx label.", style="RatesError.TLabel")
+
+            self.post_finalization_view.tkraise()
+            self.rates_table_configurable = False
+            self.exit_application_button.focus_set()
+
+        else:
+            self.root.after(50, self.check_label_result, future)
 
 
     def start_new_shipment(self):
