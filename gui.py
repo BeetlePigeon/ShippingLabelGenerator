@@ -86,7 +86,7 @@ class GUI:
         self.rp_error_label = ttk.Label(self.rp_outer_frame, text="", style="Error.TLabel")
         self.rp_error_label.grid(row=1, column=0, pady=(5, 0))
 
-        self.progress_bar = ttk.Progressbar(self.rp_outer_frame, orient="horizontal", mode="indeterminate", length=180)
+        self.progress_bar = ttk.Progressbar(self.rp_outer_frame, orient="horizontal", mode="indeterminate", style="Horizontal.TProgressbar", length=180)
         self.root.update_idletasks()
         self.rp_outer_frame.rowconfigure(2, minsize=self.progress_bar.winfo_reqheight())
         self.progress_bar.grid(row=2, column=0)
@@ -213,7 +213,7 @@ class GUI:
         style = ttk.Style(self.root)
         style.theme_use("clam")
 
-        style.configure("Horizontal.TProgressbar", thickness=8)
+        style.configure("Horizontal.TProgressbar", background=c["primary"], troughcolor=c["sky"], bordercolor=c["sky"], thickness=8, borderwidth=1)
         style.configure("Required.TLabel", background=c["surface"], foreground=c["asterisk"], font=(self.main_font, 10, "bold"))
         style.configure("TFrame", background=c["bg"])
         style.configure("Card.TFrame", background=c["surface"], relief="solid", borderwidth=1, bordercolor=c["border"])
