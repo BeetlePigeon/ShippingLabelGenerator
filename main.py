@@ -1,6 +1,13 @@
-from gui import GUI
+import error_logging
+import logging
 
 
 if __name__ == '__main__':
-    gui = GUI()
-    gui.run()
+    try:
+        from gui import GUI
+        app = GUI()
+        app.run()
+
+    except Exception:
+        logging.exception("Unhandled application exception")
+        raise

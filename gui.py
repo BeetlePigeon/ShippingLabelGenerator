@@ -7,6 +7,7 @@ from PIL import Image, ImageTk
 from pathlib import Path
 from tables import state_codes
 from concurrent.futures import ThreadPoolExecutor
+import logging
 
 
 class GUI:
@@ -156,6 +157,7 @@ class GUI:
 
 
     def handle_callback_exception(self, exception, value, traceback):
+        logging.error("Unhandled GUI exception", exc_info=(exception, value, traceback))
         self.root.destroy()
 
 
