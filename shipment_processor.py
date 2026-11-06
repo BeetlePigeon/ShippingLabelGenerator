@@ -7,7 +7,7 @@ from scraper import Scraper
 from parser import Parser
 from tables import state_codes
 from schema_classes import Address, Shipment, RatesOption, RatesOptions
-from config import APIEnvironment, ship_API_config, rates_API_config, validation_API_config, LABEL_SUBDIR, DEFAULT_SHIPMENT_WEIGHT
+from config import APIEnvironment, ship_API_config, rates_API_config, validation_API_config, LABEL_SUBDIR
 from api_requests import request_access_token, request_suggested_address, request_rates_options, request_shipping_label
 from private import (
     sandbox_api_key,
@@ -27,6 +27,7 @@ from private import (
     shipper_name,
     shipper_email_address,
     shipper_phone_number,
+    default_shipment_weight,
 )
 
 
@@ -188,7 +189,7 @@ class Processor:
         address_classification = -1
 
         reference = "no_reference"
-        weight = DEFAULT_SHIPMENT_WEIGHT
+        weight = default_shipment_weight
         other_emails = self.parser.parse_others_to_notify(rp_dict)
 
         self.preshipment_details["recipient_name"] = name
@@ -344,7 +345,7 @@ class Processor:
             recipient_address_is_commercial=bool(self.preshipment_details["address_is_commercial"]),
 
             reference=self.preshipment_details["reference"],
-            weight=self.preshipment_details["weight"] or DEFAULT_SHIPMENT_WEIGHT,
+            weight=self.preshipment_details["weight"] or default_shipment_weight,
             other_email_1=self.preshipment_details["other_email_1"],
             other_email_2=self.preshipment_details["other_email_2"],
             other_email_3=self.preshipment_details["other_email_3"],

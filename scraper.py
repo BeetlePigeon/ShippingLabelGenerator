@@ -1,11 +1,12 @@
 from playwright.sync_api import sync_playwright
+import os
 from pathlib import Path
 from schema_classes import RequestPortalData
 
 
 class Scraper:
     def __init__(self):
-        self.playwright_profile = Path(__file__).parent / "playwright_profile"
+        self.playwright_profile = Path(os.environ["LOCALAPPDATA"]) / "ASCShippingLabelTool" / "playwright_profile"
 
 
     def get_field_value(self, page, field_name):

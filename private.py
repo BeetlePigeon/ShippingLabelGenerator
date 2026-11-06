@@ -1,8 +1,10 @@
+import sys
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-
-load_dotenv()
+app_dir = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).parent
+load_dotenv(app_dir / ".env")
 
 sandbox_api_key = os.environ["FEDEX_SANDBOX_API_KEY"]
 sandbox_secret_key = os.environ["FEDEX_SANDBOX_SECRET_KEY"]
@@ -27,3 +29,4 @@ shipper_address_is_commercial = os.environ["SHIPPER_ADDRESS_IS_COMMERCIAL"].lowe
 shipper_name = os.environ["SHIPPER_NAME"]
 shipper_email_address = os.environ["SHIPPER_EMAIL_ADDRESS"]
 shipper_phone_number = os.environ["SHIPPER_PHONE_NUMBER"]
+default_shipment_weight = os.environ["DEFAULT_SHIPMENT_WEIGHT"]

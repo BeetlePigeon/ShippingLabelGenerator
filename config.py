@@ -12,5 +12,3 @@ rates_API_config = APIEnvironment.PRODUCTION
 validation_API_config = APIEnvironment.PRODUCTION
 
 LABEL_SUBDIR = "ShippingLabels"
-
-DEFAULT_SHIPMENT_WEIGHT = "8"
